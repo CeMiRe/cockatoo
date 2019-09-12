@@ -2,18 +2,11 @@ use std;
 use std::io::Read;
 use std::process;
 
-pub fn check_for_bwa() {
-    self::check_for_external_command_presence("BWA", "which bwa");
-}
-
-pub fn check_for_samtools() {
-    self::check_for_external_command_presence("samtools", "which samtools");
-}
-
 pub fn check_for_mash() {
     self::check_for_external_command_presence("mash", "which mash");
 }
 
+// TODO: This might be better in a utilities crate.
 fn check_for_external_command_presence(
     executable_name: &str, testing_cmd: &str) {
     debug!("Checking for {} ..", executable_name);

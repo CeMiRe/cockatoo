@@ -2,7 +2,7 @@ use std;
 
 use csv;
 
-use mapping_parameters::*;
+use coverm::mapping_parameters::*;
 
 pub fn screen_and_print_matching_genomes(
     mash_db_path_str: &str,

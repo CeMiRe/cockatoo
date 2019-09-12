@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use kmer_coverage::*;
-use genomes_and_contigs::GenomesAndContigs;
+use coverm::genomes_and_contigs::GenomesAndContigs;
 use core_genome;
 use core_genome::{CoreGenomePseudoaligner,CoreGenomicRegion};
 use nucmer_core_genome_generator::nucmer_core_genomes_from_genome_fasta_files;

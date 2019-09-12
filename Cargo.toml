@@ -1,12 +1,12 @@
 [package]
-name = "coverm"
-version = "0.2.0-alpha7"
+name = "cockatoo"
+version = "0.1.0-dev"
 authors = ["Ben Woodcroft <benjwoodcroft@gmail.com>"]
 license = "GPL-3.0"
-description = "Read coverage calculator for metagenomics"
-homepage = "https://github.com/wwood/CoverM"
-repository = "https://github.com/wwood/CoverM"
-documentation = "https://github.com/wwood/CoverM"
+description = "Strain-specific read coverage calculator for metagenomics"
+#homepage = "https://github.com/wwood/cockatoo"
+#repository = "https://github.com/wwood/cockatoo"
+#documentation = "https://github.com/wwood/cockatoo"
 readme = "README.md"
 exclude = [ # Max upload is 10MB, as of writing test data was 15MB
   "tests/*",
@@ -14,11 +14,9 @@ exclude = [ # Max upload is 10MB, as of writing test data was 15MB
 
 [dependencies]
 bio = "0.27.*"
-rust-htslib = "0.24.*"
 clap = "2.*"
 log = "0.4.*"
 env_logger = "0.6.*"
-nix = "0.14.*"
 tempdir = "0.3.*"
 tempfile = "3.0.*"
 ansi_term = "0.11"
@@ -35,6 +33,7 @@ snap = "0.2"
 csv = "1.1"
 rstar = "0.5"
 finch = "0.2"
+coverm = { git = "https://github.com/wwood/CoverM", rev = "5bd3c9189a12f18624cca980b2309a88a9f55dc9" }
 
 [dev-dependencies]
 assert_cli = "0.6.*"

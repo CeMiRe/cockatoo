@@ -3,7 +3,7 @@ use std::io::BufWriter;
 
 use pseudoaligner::*;
 use pseudoaligner::build_index::build_index;
-use genomes_and_contigs::GenomesAndContigs;
+use coverm::genomes_and_contigs::GenomesAndContigs;
 use bio::io::fasta;
 use bincode;
 use debruijn::dna_string::DnaString;
