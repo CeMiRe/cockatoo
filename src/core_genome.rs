@@ -9,7 +9,7 @@ use pseudoaligner::config::LEFT_EXTEND_FRACTION;
 use pseudoaligner::pseudoaligner::intersect;
 
 use pseudoalignment_reference_readers::DebruijnIndex;
-use genomes_and_contigs::GenomesAndContigs;
+use coverm::genomes_and_contigs::GenomesAndContigs;
 
 // A region marked as being core for a clade
 #[derive(Clone, PartialEq, PartialOrd, Debug)]
@@ -803,6 +803,7 @@ mod tests {
     use bio::io::fasta;
     use pseudoaligner::*;
     use pseudoalignment_reference_readers::*;
+    use coverm::read_genome_fasta_files;
 
     fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -834,11 +835,14 @@ mod tests {
             reference_reader,
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
+        let geco = read_genome_fasta_files(
+            &vec!["tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna"]);
 
         let core_aligner = generate_core_genome_pseudoaligner(
             &cores,
             &vec![vec![seqs]],
             index,
+            &geco,
         );
         debug!("done");
 
@@ -885,11 +889,14 @@ mod tests {
             reference_reader,
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
+        let geco = read_genome_fasta_files(
+            &vec!["tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna"]);
 
         let core_aligner = generate_core_genome_pseudoaligner(
             &cores,
             &vec![vec![seqs]],
             index,
+            &geco,
         );
         debug!("done");
 
@@ -935,12 +942,16 @@ mod tests {
             }]],
         ];
 
+        let geco = coverm::read_genome_definition_file(
+            "tests/data/2_single_species_dummy_dataset/2genomes/each_contig_one_genome.definition");
+
         // Build index
         let reference_reader = fasta::Reader::from_file(
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
         )
         .expect("reference reading failed.");
-        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+        let index = generate_debruijn_index_grouping_via_genomes_and_contigs::<debruijn::kmer::Kmer24>(
+            &geco,
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
             1);
 
@@ -958,6 +969,7 @@ mod tests {
             &cores,
             &vec![vec![vec![s0]], vec![vec![s1]]],
             index,
+            &geco,
         );
         debug!("done");
 
@@ -997,6 +1009,9 @@ mod tests {
             }],
         ]];
 
+        let geco = coverm::read_genome_definition_file(
+            "tests/data/2_single_species_dummy_dataset/two_genomes_tsv");
+
         // Build index
         let reference_reader = fasta::Reader::from_file(
             "tests/data/2_single_species_dummy_dataset/two_diverging_genomes.fna",
@@ -1020,6 +1035,7 @@ mod tests {
             &cores,
             &vec![vec![vec![s0], vec![s1]]],
             index,
+            &geco,
         );
         debug!("done");
 
@@ -1094,6 +1110,9 @@ mod tests {
             }]],
         ];
 
+        let geco = coverm::read_genome_definition_file(
+            "tests/data/2_single_species_dummy_dataset/2genomes/each_contig_one_genome.definition");
+
         // Build index
         let reference_reader = fasta::Reader::from_file(
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
@@ -1118,6 +1137,7 @@ mod tests {
             &cores,
             &vec![vec![vec![s0]], vec![vec![s1]]],
             index,
+            &geco,
         );
 
         let dna = DnaString::from_acgt_bytes(b"ATCGCCCGTCACCACCCCAATTCATACACCACTAGCGGTTAGCAACGATT");
@@ -1151,6 +1171,9 @@ mod tests {
             }]],
         ];
 
+        let geco = coverm::read_genome_definition_file(
+            "tests/data/2_single_species_dummy_dataset/2genomes/each_contig_one_genome.definition");
+
         // Build index
         let reference_reader = fasta::Reader::from_file(
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
@@ -1175,6 +1198,7 @@ mod tests {
             &cores,
             &vec![vec![vec![s0]], vec![vec![s1]]],
             index,
+            &geco,
         );
 
         // non-core read (1 kmer) because the A at the start is an overhang.

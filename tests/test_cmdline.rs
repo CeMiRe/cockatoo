@@ -5,8 +5,6 @@ extern crate tempfile;
 mod tests {
     use assert_cli::Assert;
     extern crate tempfile;
-    use std;
-    use std::io::Write;
  
     #[test]
     fn test_contig_kmer_hello_world() {
