@@ -53,11 +53,14 @@ mod tests {
                 "genome",
                 "--single",
                 "tests/data/2_single_species_dummy_dataset/reads/2genomes_2_reads.fq",
+                "--clades",
+                "tests/data/2_single_species_dummy_dataset/2genomes_same_genome.clades",
                 "-r",
                 "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna",
                 "--genome-definition",
                 "tests/data/2_single_species_dummy_dataset/single_genome_example_tsv"])
             .succeeds()
+            // This seems to be a legitimate problem. Genome length is incorrect, maybe because repeats are only counted once?
             .stdout().is(
                 "Sample	Genome	Coverage\n\
                  tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna/tests/data/2_single_species_dummy_dataset/reads/2genomes_2_reads.fq	g	0.226\n")

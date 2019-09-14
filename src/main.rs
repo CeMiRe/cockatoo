@@ -134,16 +134,21 @@ fn main(){
             let index = match m.is_present("separator") {
                 true => {
                     info!("Generating DeBruijn index using separator character ..");
-
                     cockatoo::pseudoalignment_reference_readers::generate_debruijn_index_grouping_via_separator::
                     <cockatoo::pseudoaligner::config::KmerType>(
                         reference, parse_separator(m).expect("Failed to find separator") as char, num_threads)
                 },
                 false => {
-                    let genome_fasta_files: Vec<String> = parse_list_of_genome_fasta_files(m);
-                    info!("Reading contig names for {} genomes ..", genome_fasta_files.len());
-                    let genomes_and_contigs = coverm::read_genome_fasta_files(
-                        &genome_fasta_files.iter().map(|s| s.as_str()).collect());
+                    let genomes_and_contigs = if m.is_present("genome-definition") {
+                        let definition_file = m.value_of("genome-definition").unwrap();
+                        info!("Reading contig names associated with each genome from {}..", definition_file);
+                        coverm::read_genome_definition_file(&definition_file)
+                    } else {
+                        let genome_fasta_files: Vec<String> = parse_list_of_genome_fasta_files(m);
+                        info!("Reading contig names for {} genomes ..", genome_fasta_files.len());
+                        coverm::read_genome_fasta_files(
+                            &genome_fasta_files.iter().map(|s| s.as_str()).collect())
+                    };
 
                     info!("Generating index based on info from individual genome files ..");
                     cockatoo::pseudoalignment_reference_readers::generate_debruijn_index_grouping_via_genomes_and_contigs::
@@ -718,7 +723,7 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .multiple(true)
                      .conflicts_with("genome-fasta-directory")
                      .required_unless_one(
-                         &["genome-fasta-directory","separator"])
+                         &["genome-fasta-directory","separator","genome-definition"])
                      .takes_value(true))
                 .arg(Arg::with_name("genome-fasta-directory")
                      .short("d")
@@ -726,7 +731,7 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .conflicts_with("separator")
                      .conflicts_with("genome-fasta-files")
                      .required_unless_one(
-                         &["genome-fasta-files","separator"])
+                         &["genome-fasta-files","separator","genome-definition"])
                      .takes_value(true))
                 .arg(Arg::with_name("genome-fasta-extension")
                      .short("x")
@@ -740,8 +745,21 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .short("s")
                      .long("separator")
                      .required_unless_one(
-                         &["genome-fasta-directory","genome-fasta-files"])
+                         &["genome-fasta-directory","genome-fasta-files","genome-definition"])
                      .takes_value(true))
+                .arg(
+                    Arg::with_name("genome-definition")
+                        .long("genome-definition")
+                        .conflicts_with("separator")
+                        .conflicts_with("genome-fasta-files")
+                        .conflicts_with("genome-fasta-directory")
+                        .required_unless_one(&[
+                            "genome-fasta-files",
+                            "separator",
+                            "genome-fasta-directory",
+                        ])
+                        .takes_value(true),
+                )
 
                 .arg(Arg::with_name("verbose")
                      .short("v")
