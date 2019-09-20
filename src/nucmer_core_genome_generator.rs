@@ -30,6 +30,7 @@ impl rstar::RTreeObject for AlignedSection {
 
 #[derive(Debug, PartialOrd, PartialEq, Clone, Eq, Ord)]
 struct RefAlignedSection {
+    // Must the defined as start then stop so ordering is correctly derived.
     pub start: i64, // i64 since u32 isn't supported by rstar
     pub stop: i64,
 }
@@ -248,6 +249,7 @@ fn intersect(
                                 )
                             }
                         }
+                        new_alignments = flatten_aligned_regions(new_alignments);
                         regions_vec[ref_contig_id] = Some(RTree::bulk_load(new_alignments))
                     }
                 }
@@ -255,6 +257,28 @@ fn intersect(
             regions_vec
         }
     }
+}
+
+fn flatten_aligned_regions(
+    mut new_alignments: Vec<RefAlignedSection>
+) -> Vec<RefAlignedSection> {
+
+    new_alignments.sort();
+    let mut to_return = vec!();
+    for align in new_alignments {
+        if to_return.len() == 0 {
+            to_return.push(align)
+        } else {
+            let last = to_return.last_mut().unwrap();
+            if align.start <= last.stop {
+                last.stop = std::cmp::max(last.stop, align.stop)
+            } else {
+                to_return.push(align)
+            }
+        }
+    }
+
+    return to_return
 }
 
 fn union(
@@ -596,5 +620,24 @@ mod tests {
               "tests/data/parsnp/1_first_group/73.20120600_E3D.30.fna"],
             8
         );
+    }
+
+    #[test]
+    fn test_flatten_aligned_regions() {
+        let input = vec!(
+            RefAlignedSection { start: 9, stop: 14 },
+            RefAlignedSection { start: 10, stop: 19 },
+            RefAlignedSection { start: 100, stop: 180 },
+            RefAlignedSection { start: 7, stop: 13 },
+            RefAlignedSection { start: 79, stop: 83 },
+            RefAlignedSection { start: 83, stop: 85 },
+            );
+        assert_eq!(
+            vec!(
+                RefAlignedSection { start: 7, stop: 19 },
+                RefAlignedSection { start: 79, stop: 85 },
+                RefAlignedSection { start: 100, stop: 180 },
+            ),
+            flatten_aligned_regions(input));
     }
 }

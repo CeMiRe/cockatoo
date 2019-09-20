@@ -77,7 +77,10 @@ mod tests {
                 "-r",
                 "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna",
                 "--genome-definition",
-                "tests/data/2_single_species_dummy_dataset/two_genomes_tsv"])
+                "tests/data/2_single_species_dummy_dataset/two_genomes_tsv",
+                "--clades",
+                "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.different_clades",
+                ])
             .succeeds()
             .stdout().is(
                 "Sample	Genome	Coverage\n\

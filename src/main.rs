@@ -527,6 +527,7 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .long("reference")
                      .takes_value(true)
                      .multiple(true)
+                     .required(true)
                      .conflicts_with("bam-files"))
                 .arg(Arg::with_name("bam-file-cache-directory")
                      .long("bam-file-cache-directory")
