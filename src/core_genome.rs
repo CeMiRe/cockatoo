@@ -1,7 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::BufWriter;
+use std::fs::File;
 
 use debruijn::dna_string::DnaString;
 use debruijn::{Dir, Kmer, Mer, Vmer};
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
+use bincode;
+
 use pseudoaligner::pseudoaligner::Pseudoaligner;
 use pseudoaligner::pseudoaligner::PseudoalignmentReadMapper;
 
@@ -10,6 +15,7 @@ use pseudoaligner::pseudoaligner::intersect;
 
 use pseudoalignment_reference_readers::DebruijnIndex;
 use coverm::genomes_and_contigs::GenomesAndContigs;
+
 
 // A region marked as being core for a clade
 #[derive(Clone, PartialEq, PartialOrd, Debug)]
@@ -23,7 +29,8 @@ pub struct CoreGenomicRegion {
 /// Represent a Pseudoaligner that has extra annotations, specifically, some
 /// regions are marked as being 'core' for a given clade, and so it is more
 /// reliable to calculate abundance just based only on these regions.
-pub struct CoreGenomePseudoaligner<'a, K: Kmer + Send + Sync> {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CoreGenomePseudoaligner<K: Kmer + Send + Sync> {
     pub index: Pseudoaligner<K>,
 
     /// Names of all contigs, in the same order as what was used to generate the
@@ -41,10 +48,37 @@ pub struct CoreGenomePseudoaligner<'a, K: Kmer + Send + Sync> {
     pub node_id_to_clade_cores: BTreeMap<usize, Vec<u32>>,
 
     /// TODO: Remove the duplicated info here
-    pub genomes_and_contigs: &'a GenomesAndContigs,
+    pub genomes_and_contigs: GenomesAndContigs,
 }
 
-impl<'a, K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligner<'a, K> {
+pub fn save_index<K>(
+    index: CoreGenomePseudoaligner<K>,
+    output_file: &str)
+where K: Kmer + Serialize + Send + Sync {
+
+    let f = File::create(output_file).unwrap();
+    let writer = BufWriter::new(f);
+    let mut snapper = snap::Writer::new(writer);
+    info!("Writing cockatoo index to {} ..", output_file);
+    bincode::serialize_into(&mut snapper, &index)
+        .expect("Failure to serialize or write index");
+    info!("Finished writing index");
+}
+
+pub fn restore_index<'a, K: Kmer + DeserializeOwned + Send + Sync>(
+    saved_index_path: &'a str)
+    -> CoreGenomePseudoaligner<K> {
+
+    let f = File::open(saved_index_path).expect("file not found");
+    let mut unsnapper = snap::Reader::new(f);
+    debug!("Deserialising cockatoo index ..");
+    return bincode::deserialize_from(&mut unsnapper)
+        .expect("Error reading previously saved index - perhaps it was \
+                 generated with a different version of CoverM?");
+}
+
+
+impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligner<K> {
     fn map_read(&self, read_seq: &DnaString) -> Option<(Vec<u32>, usize)> {
         // TODO: Change below to work out whether the node is in a core genome or not
 
@@ -345,8 +379,8 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
     core_genome_regions: &Vec<Vec<Vec<CoreGenomicRegion>>>,
     contig_sequences: &Vec<Vec<Vec<DnaString>>>,
     aligner: DebruijnIndex<K>,
-    genomes_and_contigs: &'a GenomesAndContigs,
-) -> CoreGenomePseudoaligner<'a, K> {
+    genomes_and_contigs: GenomesAndContigs,
+) -> CoreGenomePseudoaligner<K> {
     let mut node_id_to_clade_cores: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
     let mut genome_clade_ids: Vec<usize> = vec![];
     let mut core_genome_sizes: Vec<usize> = vec![];

@@ -3,10 +3,7 @@ use std::path::Path;
 
 use kmer_coverage::*;
 use coverm::genomes_and_contigs::GenomesAndContigs;
-use core_genome;
 use core_genome::{CoreGenomePseudoaligner,CoreGenomicRegion};
-use nucmer_core_genome_generator::nucmer_core_genomes_from_genome_fasta_files;
-use pseudoalignment_reference_readers::DebruijnIndex;
 
 use pseudoaligner::*;
 use debruijn::Kmer;
@@ -82,9 +79,10 @@ pub fn calculate_genome_kmer_coverage<K: Kmer + Sync + Send>(
     reverse_fastq: Option<&str>,
     num_threads: usize,
     print_zero_coverage_contigs: bool,
-    core_genome_aligner: &CoreGenomePseudoaligner<K>,
-    genomes_and_contigs: &GenomesAndContigs)
+    core_genome_aligner: &CoreGenomePseudoaligner<K>)
     -> Vec<(usize, f64)> {
+
+    let genomes_and_contigs = &core_genome_aligner.genomes_and_contigs;
 
     // Do the mappings
     let reads = fastq::Reader::from_file(forward_fastq)
@@ -262,7 +260,7 @@ fn generate_genome_to_contig_indices_vec(
     return tx_ids_of_genomes
 }
 
-fn report_core_genome_sizes(
+pub fn report_core_genome_sizes(
     nucmer_core_genomes: &Vec<Vec<Vec<CoreGenomicRegion>>>,
     clades: &Vec<Vec<String>>) {
 
@@ -301,7 +299,7 @@ fn report_core_genome_sizes(
 
 /// Read in each contig from each genome of each clade, given a path to their
 /// fasta files.
-fn read_clade_genome_strings(
+pub fn read_clade_genome_strings(
     clades: &Vec<Vec<String>>)
     -> Vec<Vec<Vec<DnaString>>> {
 
@@ -340,54 +338,18 @@ pub fn core_genome_coverage_pipeline<K: Kmer + Send + Sync>(
     read_inputs: &Vec<PseudoalignmentReadInput>,
     num_threads: usize,
     print_zero_coverage_contigs: bool,
-    index: DebruijnIndex<K>,
-    genomes_and_contigs: &GenomesAndContigs,
-    clades: &Vec<Vec<String>>,
-    write_gfa: bool,) {
-
-    assert!(clades.len() > 0);
+    core_genome_pseudoaligner: &CoreGenomePseudoaligner<K>,
+    write_gfa: bool) {
 
     // Write GFA TODO: debug
     if write_gfa { 
         info!("Writing GFA file ..");
         let mut gfa_writer = std::fs::File::create("/tmp/my.gfa").unwrap();
-        index.index.dbg.write_gfa(&mut gfa_writer).unwrap();
+        core_genome_pseudoaligner.index.dbg.write_gfa(&mut gfa_writer).unwrap();
     }
 
-    // For each clade, nucmer against the first genome.
-    info!("Calculating core genomes ..");
-    // TODO: ProgressBar?
-    let nucmer_core_genomes: Vec<Vec<Vec<CoreGenomicRegion>>> = clades
-        .iter()
-        .enumerate()
-        .map(
-            |(i, clade_fastas)|
-            nucmer_core_genomes_from_genome_fasta_files(
-                &clade_fastas.iter().map(|s| &**s).collect::<Vec<&str>>()[..],
-                i as u32)
-        ).collect();
-    info!("Finished calculating core genomes");
-
-    // Check core genome sizes / report
-    report_core_genome_sizes(&nucmer_core_genomes, clades);
-
-    debug!("Found core genomes: {:#?}", nucmer_core_genomes);
-
-    // Thread genomes recording the core genome nodes
-    // TODO: These data are at least sometimes read in repeatedly, when they
-    // maybe should just be cached or something.
-    info!("Reading in genome FASTA files to thread graph");
-    let dna_strings = read_clade_genome_strings(clades);
-    info!("Threading DeBruijn graph");
-    let core_genome_pseudoaligner = core_genome::generate_core_genome_pseudoaligner(
-        &nucmer_core_genomes,
-        &dna_strings,
-        index,
-        genomes_and_contigs,
-    );
-
     debug!("Found node_to_core_genomes: {:#?}",
-           &core_genome_pseudoaligner.node_id_to_clade_cores);
+           core_genome_pseudoaligner.node_id_to_clade_cores);
     if write_gfa {
         // Write CSV data to be loaded into bandage
         use std::io::Write;
@@ -409,14 +371,13 @@ pub fn core_genome_coverage_pipeline<K: Kmer + Send + Sync>(
             },
             num_threads,
             print_zero_coverage_contigs,
-            &core_genome_pseudoaligner,
-            genomes_and_contigs);
+            core_genome_pseudoaligner);
 
         for res in covs {
             println!(
                 "{}\t{}\t{}",
                 read_input.sample_name,
-                genomes_and_contigs.genomes[res.0],
+                core_genome_pseudoaligner.genomes_and_contigs.genomes[res.0],
                 res.1);
         }
         info!("Finished printing genome coverages for sample {}",

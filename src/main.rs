@@ -66,6 +66,9 @@ fn main(){
 
             let pseudoalign_params = parse_pseudoaligner_parameters(&m);
 
+            let core_genome_pseudoaligner = cockatoo::core_genome::restore_index(
+                m.value_of("index").unwrap());
+
             match genomes_and_contigs_option {
                 None => {
                     // TODO: Implement.
@@ -74,16 +77,11 @@ fn main(){
                     process::exit(1);
                 },
                 Some(genomes_and_contigs) => {
-                    let clade_definitions_file = m.value_of("clades").expect("--clades not given");
-                    let clades  = cockatoo::genome_pseudoaligner::read_clade_definition_file(
-                        clade_definitions_file);
                     cockatoo::genome_pseudoaligner::core_genome_coverage_pipeline(
                         &pseudoalign_params.reads,
                         pseudoalign_params.num_threads,
                         !m.is_present("no-zeros"),
-                        pseudoalign_params.index,
-                        &genomes_and_contigs,
-                        &clades,
+                        &core_genome_pseudoaligner,
                         m.is_present("write-gfa"),
                     );
                 }
@@ -159,6 +157,38 @@ fn main(){
                     )
                 }
             };
+
+            // For each clade, nucmer against the first genome.
+            info!("Calculating core genomes ..");
+            // TODO: ProgressBar? Multithread?
+            let nucmer_core_genomes: Vec<Vec<Vec<CoreGenomicRegion>>> = clades
+                .iter()
+                .enumerate()
+                .map(
+                    |(i, clade_fastas)|
+                    nucmer_core_genomes_from_genome_fasta_files(
+                        &clade_fastas.iter().map(|s| &**s).collect::<Vec<&str>>()[..],
+                        i as u32)
+                ).collect();
+            info!("Finished calculating core genomes");
+
+            // Check core genome sizes / report
+            report_core_genome_sizes(&nucmer_core_genomes, clades);
+
+            debug!("Found core genomes: {:#?}", nucmer_core_genomes);
+
+            // Thread genomes recording the core genome nodes
+            // TODO: These data are at least sometimes read in repeatedly, when they
+            // maybe should just be cached or something.
+            info!("Reading in genome FASTA files to thread graph");
+            let dna_strings = read_clade_genome_strings(clades);
+            info!("Threading DeBruijn graph");
+            let core_genome_pseudoaligner = core_genome::generate_core_genome_pseudoaligner(
+                &nucmer_core_genomes,
+                &dna_strings,
+                index,
+                genomes_and_contigs,
+            );
 
             info!("Saving index ..");
             cockatoo::pseudoalignment_reference_readers::save_index(
@@ -307,10 +337,27 @@ fn parse_list_of_genome_fasta_files(m: &clap::ArgMatches) -> Vec<String> {
 
 struct PseudoAlignmentParameters {
     pub num_threads: usize,
+    pub reads: Vec<cockatoo::kmer_coverage::PseudoalignmentReadInput>
     pub reference: String,
-    pub reads: Vec<cockatoo::kmer_coverage::PseudoalignmentReadInput>,
-    pub index: cockatoo::pseudoalignment_reference_readers::
-        DebruijnIndex<debruijn::kmer::VarIntKmer<u64, debruijn::kmer::K24>>
+}
+
+fn parse_contig_index_parameters(
+    m: &clap::ArgMatches, reference: &str)
+-> cockatoo::pseudoalignment_reference_readers::
+    DebruijnIndex<debruijn::kmer::VarIntKmer<u64, debruijn::kmer::K24>> {
+        
+    let potential_index_file = format!("{}.covermdb", reference);
+    return match Path::new(&potential_index_file).exists() {
+        true => {
+            info!("Using pre-existing index {}", potential_index_file);
+            cockatoo::pseudoalignment_reference_readers::restore_index::<cockatoo::pseudoaligner::config::KmerType>(
+                &potential_index_file)
+        },
+        false => {
+            error!("No pre-existing index file found");
+            process::exit(1);
+        }
+    };
 }
 
 fn parse_pseudoaligner_parameters(
@@ -320,7 +367,8 @@ fn parse_pseudoaligner_parameters(
     let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
     let reference = m.value_of("reference").unwrap();
 
-    let mapping_parameters = MappingParameters::generate_from_clap(&m, &None);
+    let mapping_parameters = MappingParameters::generate_from_clap(
+        &m, coverm::bam_generator::MappingProgram::BWA_MEM, &None);
 
     let mut pseudoalignment_read_input = vec!();
     // TODO: Accept interleaved output here, in genome and in screen
@@ -336,24 +384,10 @@ fn parse_pseudoaligner_parameters(
 
     }
 
-    let potential_index_file = format!("{}.covermdb", reference);
-    let index = match Path::new(&potential_index_file).exists() {
-        true => {
-            info!("Using pre-existing index {}", potential_index_file);
-            cockatoo::pseudoalignment_reference_readers::restore_index::<cockatoo::pseudoaligner::config::KmerType>(
-                &potential_index_file)
-        },
-        false => {
-            error!("No pre-existing index file found");
-            process::exit(1);
-        }
-    };
-
     return PseudoAlignmentParameters {
         num_threads: num_threads,
-        reference: reference.to_string(),
         reads: pseudoalignment_read_input,
-        index: index
+        reference: reference.to_string(),
     }
 }
 
@@ -603,9 +637,6 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .conflicts_with("genome-fasta-files")
                      .conflicts_with("genome-fasta-directory")
                      .conflicts_with("genome-definition"))
-                .arg(Arg::with_name("clades")
-                     .long("clades")
-                     .takes_value(true))
                 .arg(Arg::with_name("write-gfa")
                      .long("write-gfa"))
                 .arg(Arg::with_name("no-zeros")
@@ -697,6 +728,11 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .long("threads")
                      .default_value("1")
                      .takes_value(true))
+                .arg(Arg::with_name("clades")
+                     .long("clades")
+                     .takes_value(true)
+                     .required(true))
+
                 .arg(Arg::with_name("verbose")
                      .short("v")
                      .long("verbose"))

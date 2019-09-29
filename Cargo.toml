@@ -33,7 +33,8 @@ snap = "0.2"
 csv = "1.1"
 rstar = "0.5"
 finch = "0.2"
-coverm = { git = "https://github.com/wwood/CoverM", rev = "5bd3c9189a12f18624cca980b2309a88a9f55dc9" }
+#coverm = { git = "https://github.com/wwood/CoverM", rev = "5bd3c9189a12f18624cca980b2309a88a9f55dc9" }
+coverm = { path = "../coverm" }
 
 [dev-dependencies]
 assert_cli = "0.6.*"
