@@ -169,6 +169,12 @@ fn main(){
             let m = matches.subcommand_matches("cluster").unwrap();
             set_log_level(m, true);
 
+            let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(num_threads)
+                .build_global()
+                .expect("Programming error: rayon initialised multiple times");
+
             let genome_fasta_files: Vec<String> = parse_list_of_genome_fasta_files(m);
             let v2: Vec<&str> = genome_fasta_files.iter().map(|s| &**s).collect();
             info!("Clustering {} genomes ..", genome_fasta_files.len());
@@ -721,6 +727,12 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      // genome mode, not sure about here) - clap bug?
                      //.requires("genome-fasta-directory")
                      .default_value("fna")
+                     .takes_value(true))
+
+                .arg(Arg::with_name("threads")
+                     .short("-t")
+                     .long("threads")
+                     .default_value("1")
                      .takes_value(true)))
 
         .subcommand(
