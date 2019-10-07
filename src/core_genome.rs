@@ -876,7 +876,7 @@ mod tests {
             &cores,
             &vec![vec![seqs]],
             index,
-            &geco,
+            geco,
         );
         debug!("done");
 
@@ -930,7 +930,7 @@ mod tests {
             &cores,
             &vec![vec![seqs]],
             index,
-            &geco,
+            geco,
         );
         debug!("done");
 
@@ -1003,7 +1003,7 @@ mod tests {
             &cores,
             &vec![vec![vec![s0]], vec![vec![s1]]],
             index,
-            &geco,
+            geco,
         );
         debug!("done");
 
@@ -1069,7 +1069,7 @@ mod tests {
             &cores,
             &vec![vec![vec![s0], vec![s1]]],
             index,
-            &geco,
+            geco,
         );
         debug!("done");
 
@@ -1171,7 +1171,7 @@ mod tests {
             &cores,
             &vec![vec![vec![s0]], vec![vec![s1]]],
             index,
-            &geco,
+            geco,
         );
 
         let dna = DnaString::from_acgt_bytes(b"ATCGCCCGTCACCACCCCAATTCATACACCACTAGCGGTTAGCAACGATT");
@@ -1232,7 +1232,7 @@ mod tests {
             &cores,
             &vec![vec![vec![s0]], vec![vec![s1]]],
             index,
-            &geco,
+            geco,
         );
 
         // non-core read (1 kmer) because the A at the start is an overhang.

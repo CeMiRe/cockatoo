@@ -1,13 +1,12 @@
 extern crate cockatoo;
 
 extern crate coverm;
-use coverm::CONCATENATED_FASTA_FILE_SEPARATOR;
+//use coverm::CONCATENATED_FASTA_FILE_SEPARATOR;
 use coverm::mapping_parameters::MappingParameters;
 use cockatoo::external_command_checker; // TODO: check for nucmer
 use std::env;
 use std::str;
 use std::process;
-use std::path::Path;
 
 extern crate clap;
 use clap::*;
@@ -21,9 +20,9 @@ use env_logger::Builder;
 #[macro_use]
 extern crate lazy_static;
 
-fn contig_full_help() -> &'static str {
-    "coverm contig: FIXME" 
-}
+// fn contig_full_help() -> &'static str {
+//     "coverm contig: FIXME" 
+// }
 fn genome_full_help() -> &'static str {
     "coverm genome: FIXME" 
 }
@@ -43,65 +42,37 @@ fn main(){
                 process::exit(1);
             }
             set_log_level(m, true);
-
-            let separator = parse_separator(m);
-            let single_genome = m.is_present("single-genome");
-            let genomes_and_contigs_option = match separator.is_some() || single_genome {
-                true => None,
-                false => {
-                    match m.is_present("genome-definition") {
-                        true => {
-                            Some(coverm::read_genome_definition_file(
-                                m.value_of("genome-definition").unwrap()))
-                        },
-                        false => {
-                            let genome_fasta_files: Vec<String> = parse_list_of_genome_fasta_files(m);
-                            info!("Reading contig names for {} genomes ..", genome_fasta_files.len());
-                            Some(coverm::read_genome_fasta_files(
-                                &genome_fasta_files.iter().map(|s| s.as_str()).collect()))
-                        }
-                    }
-                }
-            };
-
             let pseudoalign_params = parse_pseudoaligner_parameters(&m);
 
-            let core_genome_pseudoaligner = cockatoo::core_genome::restore_index(
+            info!("Restoring index ..");
+            let core_genome_pseudoaligner = cockatoo::core_genome::restore_index::<cockatoo::pseudoaligner::config::KmerType>(
                 m.value_of("index").unwrap());
 
-            match genomes_and_contigs_option {
-                None => {
-                    // TODO: Implement.
-                    error!("The kmer method must be used with multiple input \
-                            genomes and not a separator (for now)");
-                    process::exit(1);
-                },
-                Some(genomes_and_contigs) => {
-                    cockatoo::genome_pseudoaligner::core_genome_coverage_pipeline(
-                        &pseudoalign_params.reads,
-                        pseudoalign_params.num_threads,
-                        !m.is_present("no-zeros"),
-                        &core_genome_pseudoaligner,
-                        m.is_present("write-gfa"),
-                    );
-                }
-            }
-        },
-        Some("contig") => {
-            let m = matches.subcommand_matches("contig").unwrap();
-            if m.is_present("full-help") {
-                println!("{}", contig_full_help());
-                process::exit(1);
-            }
-            set_log_level(m, true);
-            let pseudoalign_params = parse_pseudoaligner_parameters(&m);
-
-            cockatoo::kmer_coverage::calculate_and_print_contig_kmer_coverages(
+            info!("Aligning reads and post-processing ..");
+            cockatoo::genome_pseudoaligner::core_genome_coverage_pipeline(
                 &pseudoalign_params.reads,
                 pseudoalign_params.num_threads,
                 !m.is_present("no-zeros"),
-                &pseudoalign_params.index,
+                &core_genome_pseudoaligner,
+                m.is_present("write-gfa"),
             );
+        },
+        Some("contig") => {
+            panic!("contig mode has been deprecated, for now.");
+            // let m = matches.subcommand_matches("contig").unwrap();
+            // if m.is_present("full-help") {
+            //     println!("{}", contig_full_help());
+            //     process::exit(1);
+            // }
+            // set_log_level(m, true);
+            // let pseudoalign_params = parse_pseudoaligner_parameters(&m);
+
+            // cockatoo::kmer_coverage::calculate_and_print_contig_kmer_coverages(
+            //     &pseudoalign_params.reads,
+            //     pseudoalign_params.num_threads,
+            //     !m.is_present("no-zeros"),
+            //     &pseudoalign_params.index,
+            // );
         },
         Some("debruijn_index_for_contig") => {
             let m = matches.subcommand_matches("debruijn_index_for_contig").unwrap();
@@ -126,54 +97,51 @@ fn main(){
             set_log_level(m, true);
 
             let reference = m.value_of("reference").unwrap();
-            let output = format!("{}.covermdb", reference);
+            let output = format!("{}.cockatoo_db", reference);
             let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
 
-            let index = match m.is_present("separator") {
-                true => {
-                    info!("Generating DeBruijn index using separator character ..");
-                    cockatoo::pseudoalignment_reference_readers::generate_debruijn_index_grouping_via_separator::
-                    <cockatoo::pseudoaligner::config::KmerType>(
-                        reference, parse_separator(m).expect("Failed to find separator") as char, num_threads)
-                },
-                false => {
-                    let genomes_and_contigs = if m.is_present("genome-definition") {
-                        let definition_file = m.value_of("genome-definition").unwrap();
-                        info!("Reading contig names associated with each genome from {}..", definition_file);
-                        coverm::read_genome_definition_file(&definition_file)
-                    } else {
-                        let genome_fasta_files: Vec<String> = parse_list_of_genome_fasta_files(m);
-                        info!("Reading contig names for {} genomes ..", genome_fasta_files.len());
-                        coverm::read_genome_fasta_files(
-                            &genome_fasta_files.iter().map(|s| s.as_str()).collect())
-                    };
 
-                    info!("Generating index based on info from individual genome files ..");
-                    cockatoo::pseudoalignment_reference_readers::generate_debruijn_index_grouping_via_genomes_and_contigs::
-                    <cockatoo::pseudoaligner::config::KmerType>(
-                        &genomes_and_contigs,
-                        reference,
-                        num_threads
-                    )
-                }
+            let genomes_and_contigs = if m.is_present("genome-definition") {
+                let definition_file = m.value_of("genome-definition").unwrap();
+                info!("Reading contig names associated with each genome from {}..", definition_file);
+                coverm::read_genome_definition_file(&definition_file)
+            } else {
+                let genome_fasta_files: Vec<String> = parse_list_of_genome_fasta_files(m);
+                info!("Reading contig names for {} genomes ..", genome_fasta_files.len());
+                coverm::read_genome_fasta_files(
+                    &genome_fasta_files.iter().map(|s| s.as_str()).collect())
             };
 
+            info!("Generating index based on info from individual genome files ..");
+            let index = cockatoo::pseudoalignment_reference_readers::generate_debruijn_index_grouping_via_genomes_and_contigs::
+            <cockatoo::pseudoaligner::config::KmerType>(
+                &genomes_and_contigs,
+                reference,
+                num_threads
+            );
+
             // For each clade, nucmer against the first genome.
-            info!("Calculating core genomes ..");
+            info!("Reading clade definition ..");
+            let clade_definitions_file = m.value_of("clades").unwrap();
+            let clades  = cockatoo::genome_pseudoaligner::read_clade_definition_file(
+                clade_definitions_file);
+
             // TODO: ProgressBar? Multithread?
-            let nucmer_core_genomes: Vec<Vec<Vec<CoreGenomicRegion>>> = clades
+            info!("Calculating core genomes ..");
+            let nucmer_core_genomes: Vec<Vec<Vec<cockatoo::core_genome::CoreGenomicRegion>>> = clades
                 .iter()
                 .enumerate()
                 .map(
                     |(i, clade_fastas)|
-                    nucmer_core_genomes_from_genome_fasta_files(
+                    cockatoo::nucmer_core_genome_generator::nucmer_core_genomes_from_genome_fasta_files(
                         &clade_fastas.iter().map(|s| &**s).collect::<Vec<&str>>()[..],
                         i as u32)
                 ).collect();
             info!("Finished calculating core genomes");
 
             // Check core genome sizes / report
-            report_core_genome_sizes(&nucmer_core_genomes, clades);
+            cockatoo::genome_pseudoaligner::report_core_genome_sizes(
+                &nucmer_core_genomes, &clades);
 
             debug!("Found core genomes: {:#?}", nucmer_core_genomes);
 
@@ -181,9 +149,10 @@ fn main(){
             // TODO: These data are at least sometimes read in repeatedly, when they
             // maybe should just be cached or something.
             info!("Reading in genome FASTA files to thread graph");
-            let dna_strings = read_clade_genome_strings(clades);
+            let dna_strings = cockatoo::genome_pseudoaligner::read_clade_genome_strings(
+                &clades);
             info!("Threading DeBruijn graph");
-            let core_genome_pseudoaligner = core_genome::generate_core_genome_pseudoaligner(
+            let core_genome_pseudoaligner = cockatoo::core_genome::generate_core_genome_pseudoaligner(
                 &nucmer_core_genomes,
                 &dna_strings,
                 index,
@@ -191,8 +160,8 @@ fn main(){
             );
 
             info!("Saving index ..");
-            cockatoo::pseudoalignment_reference_readers::save_index(
-                index, &output);
+            cockatoo::core_genome::save_index(
+                core_genome_pseudoaligner, &output);
             info!("Saving complete");
         },
 
@@ -223,7 +192,9 @@ fn main(){
             set_log_level(m, true);
 
             // Not really mapping parameters but gets the job done
-            let read_inputs = MappingParameters::generate_from_clap(&m, &None);
+            // TODO: Remove coverm from this and do our own thing. That'd cut out the rust-htslib too.
+            let read_inputs = MappingParameters::generate_from_clap(
+                &m, coverm::bam_generator::MappingProgram::BWA_MEM, &None);
             let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
 
             external_command_checker::check_for_mash();
@@ -260,30 +231,30 @@ fn parse_percentage(m: &clap::ArgMatches, parameter: &str) -> f32 {
     }
 }
 
-fn parse_separator(m: &clap::ArgMatches) -> Option<u8> {
-    let single_genome = m.is_present("single-genome");
-    if single_genome {
-        Some("0".as_bytes()[0])
-    } else if m.is_present("separator") {
-        let separator_str = m.value_of("separator").unwrap().as_bytes();
-        if separator_str.len() != 1 {
-            eprintln!(
-                "error: Separator can only be a single character, found {} ({}).",
-                separator_str.len(),
-                str::from_utf8(separator_str).unwrap());
-            process::exit(1);
-        }
-        Some(separator_str[0])
-    } else if m.is_present("bam-files") || m.is_present("reference") {
-        // Argument parsing enforces that genomes have been specified as FASTA
-        // files.
-        None
-    } else {
-        // Separator is set by CoverM and written into the generated reference
-        // fasta file.
-        Some(CONCATENATED_FASTA_FILE_SEPARATOR.as_bytes()[0])
-    }
-}
+// fn parse_separator(m: &clap::ArgMatches) -> Option<u8> {
+//     let single_genome = m.is_present("single-genome");
+//     if single_genome {
+//         Some("0".as_bytes()[0])
+//     } else if m.is_present("separator") {
+//         let separator_str = m.value_of("separator").unwrap().as_bytes();
+//         if separator_str.len() != 1 {
+//             eprintln!(
+//                 "error: Separator can only be a single character, found {} ({}).",
+//                 separator_str.len(),
+//                 str::from_utf8(separator_str).unwrap());
+//             process::exit(1);
+//         }
+//         Some(separator_str[0])
+//     } else if m.is_present("bam-files") || m.is_present("reference") {
+//         // Argument parsing enforces that genomes have been specified as FASTA
+//         // files.
+//         None
+//     } else {
+//         // Separator is set by CoverM and written into the generated reference
+//         // fasta file.
+//         Some(CONCATENATED_FASTA_FILE_SEPARATOR.as_bytes()[0])
+//     }
+// }
 
 
 fn parse_list_of_genome_fasta_files(m: &clap::ArgMatches) -> Vec<String> {
@@ -337,35 +308,34 @@ fn parse_list_of_genome_fasta_files(m: &clap::ArgMatches) -> Vec<String> {
 
 struct PseudoAlignmentParameters {
     pub num_threads: usize,
-    pub reads: Vec<cockatoo::kmer_coverage::PseudoalignmentReadInput>
-    pub reference: String,
+    pub reads: Vec<cockatoo::kmer_coverage::PseudoalignmentReadInput>,
 }
 
-fn parse_contig_index_parameters(
-    m: &clap::ArgMatches, reference: &str)
--> cockatoo::pseudoalignment_reference_readers::
-    DebruijnIndex<debruijn::kmer::VarIntKmer<u64, debruijn::kmer::K24>> {
+// fn parse_contig_index_parameters(
+//     m: &clap::ArgMatches, reference: &str)
+// -> cockatoo::pseudoalignment_reference_readers::
+//     DebruijnIndex<debruijn::kmer::VarIntKmer<u64, debruijn::kmer::K24>> {
         
-    let potential_index_file = format!("{}.covermdb", reference);
-    return match Path::new(&potential_index_file).exists() {
-        true => {
-            info!("Using pre-existing index {}", potential_index_file);
-            cockatoo::pseudoalignment_reference_readers::restore_index::<cockatoo::pseudoaligner::config::KmerType>(
-                &potential_index_file)
-        },
-        false => {
-            error!("No pre-existing index file found");
-            process::exit(1);
-        }
-    };
-}
+//     let potential_index_file = format!("{}.covermdb", reference);
+//     return match Path::new(&potential_index_file).exists() {
+//         true => {
+//             info!("Using pre-existing index {}", potential_index_file);
+//             cockatoo::pseudoalignment_reference_readers::restore_index::<cockatoo::pseudoaligner::config::KmerType>(
+//                 &potential_index_file)
+//         },
+//         false => {
+//             error!("No pre-existing index file found");
+//             process::exit(1);
+//         }
+//     };
+// }
 
 fn parse_pseudoaligner_parameters(
     m: &clap::ArgMatches)
     -> PseudoAlignmentParameters {
 
     let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
-    let reference = m.value_of("reference").unwrap();
+    let index = m.value_of("index").unwrap();
 
     let mapping_parameters = MappingParameters::generate_from_clap(
         &m, coverm::bam_generator::MappingProgram::BWA_MEM, &None);
@@ -379,7 +349,7 @@ fn parse_pseudoaligner_parameters(
                 Some(r2) => Some(r2.to_string()),
                 None => None
             },
-            sample_name: format!("{}/{}", reference, readset.0)
+            sample_name: format!("{}/{}", index, readset.0)
         })
 
     }
@@ -387,7 +357,6 @@ fn parse_pseudoaligner_parameters(
     return PseudoAlignmentParameters {
         num_threads: num_threads,
         reads: pseudoalignment_read_input,
-        reference: reference.to_string(),
     }
 }
 
@@ -506,137 +475,51 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                 .arg(Arg::with_name("full-help")
                      .long("full-help"))
 
-                .arg(Arg::with_name("bam-files")
-                     .short("b")
-                     .long("bam-files")
-                     .multiple(true)
-                     .takes_value(true))
-                .arg(Arg::with_name("sharded")
-                     .long("sharded")
-                     .required(false))
-                .arg(Arg::with_name("exclude-genomes-from-deshard")
-                     .long("exclude-genomes-from-deshard")
-                     .requires("sharded")
-                     .takes_value(true))
+                .arg(Arg::with_name("index")
+                    .long("index")
+                    .required(true)
+                    .takes_value(true))
+
                 .arg(Arg::with_name("read1")
                      .short("-1")
                      .multiple(true)
                      .takes_value(true)
                      .requires("read2")
                      .required_unless_one(
-                         &["bam-files","coupled","interleaved","single","full-help"])
-                     .conflicts_with("bam-files"))
+                         &["coupled","interleaved","single","full-help"]))
                 .arg(Arg::with_name("read2")
                      .short("-2")
                      .multiple(true)
                      .takes_value(true)
                      .requires("read1")
                      .required_unless_one(
-                         &["bam-files","coupled","interleaved","single","full-help"])
-                     .conflicts_with("bam-files"))
+                         &["coupled","interleaved","single","full-help"]))
                 .arg(Arg::with_name("coupled")
                      .short("-c")
                      .long("coupled")
                      .multiple(true)
                      .takes_value(true)
                      .required_unless_one(
-                         &["bam-files","read1","interleaved","single","full-help"])
-                     .conflicts_with("bam-files"))
+                         &["read1","interleaved","single","full-help"]))
                 .arg(Arg::with_name("interleaved")
                      .long("interleaved")
                      .multiple(true)
                      .takes_value(true)
                      .required_unless_one(
-                         &["bam-files","read1","coupled","single","full-help"])
-                     .conflicts_with("bam-files"))
+                         &["read1","coupled","single","full-help"]))
                 .arg(Arg::with_name("single")
                      .long("single")
                      .multiple(true)
                      .takes_value(true)
                      .required_unless_one(
-                         &["bam-files","read1","coupled","interleaved","full-help"])
-                     .conflicts_with("bam-files"))
-                .arg(Arg::with_name("reference")
-                     .short("-r")
-                     .long("reference")
-                     .takes_value(true)
-                     .multiple(true)
-                     .required(true)
-                     .conflicts_with("bam-files"))
-                .arg(Arg::with_name("bam-file-cache-directory")
-                     .long("bam-file-cache-directory")
-                     .takes_value(true)
+                         &["read1","coupled","interleaved","full-help"])
                      .conflicts_with("bam-files"))
                 .arg(Arg::with_name("threads")
                      .short("-t")
                      .long("threads")
                      .default_value("1")
                      .takes_value(true))
-                .arg(Arg::with_name("bwa-params")
-                     .long("bwa-params")
-                     .long("bwa-parameters")
-                     .takes_value(true)
-                     .allow_hyphen_values(true)
-                     .requires("reference")) // TODO: Relax this for autoconcatenation
-                .arg(Arg::with_name("discard-unmapped")
-                     .long("discard-unmapped")
-                     .requires("bam-file-cache-directory"))
 
-                .arg(Arg::with_name("separator")
-                     .short("s")
-                     .long("separator")
-                     .conflicts_with("genome-fasta-files")
-                     .conflicts_with("genome-fasta-directory")
-                     .conflicts_with("single-genome")
-                     .required_unless_one(
-                         &["genome-fasta-files","genome-fasta-directory","single-genome",
-                           "genome-definition","full-help"])
-                     .takes_value(true))
-                .arg(Arg::with_name("genome-fasta-files")
-                     .short("f")
-                     .long("genome-fasta-files")
-                     .multiple(true)
-                     .conflicts_with("separator")
-                     .conflicts_with("genome-fasta-directory")
-                     .conflicts_with("single-genome")
-                     .required_unless_one(
-                         &["separator","genome-fasta-directory","single-genome",
-                           "genome-definition","full-help"])
-                     .takes_value(true))
-                .arg(Arg::with_name("genome-fasta-directory")
-                     .short("d")
-                     .long("genome-fasta-directory")
-                     .conflicts_with("separator")
-                     .conflicts_with("genome-fasta-files")
-                     .conflicts_with("single-genome")
-                     .required_unless_one(
-                         &["genome-fasta-files","separator","single-genome",
-                           "genome-definition","full-help"])
-                     .takes_value(true))
-                .arg(Arg::with_name("genome-fasta-extension")
-                     .short("x")
-                     .long("genome-fasta-extension")
-                     // Unsure why, but uncommenting causes test failure - clap
-                     // bug?
-                     //.requires("genome-fasta-directory")
-                     .default_value("fna")
-                     .takes_value(true))
-                .arg(Arg::with_name("genome-definition")
-                     .long("genome-definition")
-                     .conflicts_with("separator")
-                     .conflicts_with("genome-fasta-files")
-                     .conflicts_with("genome-fasta-directory")
-                     .conflicts_with("single-genome")
-                     .required_unless_one(
-                         &["genome-fasta-files","separator","single-genome",
-                           "genome-fasta-directory","full-help"])
-                     .takes_value(true))
-                .arg(Arg::with_name("single-genome")
-                     .long("single-genome")
-                     .conflicts_with("separator")
-                     .conflicts_with("genome-fasta-files")
-                     .conflicts_with("genome-fasta-directory")
-                     .conflicts_with("genome-definition"))
                 .arg(Arg::with_name("write-gfa")
                      .long("write-gfa"))
                 .arg(Arg::with_name("no-zeros")
@@ -728,10 +611,6 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .long("threads")
                      .default_value("1")
                      .takes_value(true))
-                .arg(Arg::with_name("clades")
-                     .long("clades")
-                     .takes_value(true)
-                     .required(true))
 
                 .arg(Arg::with_name("verbose")
                      .short("v")
@@ -753,6 +632,11 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .long("threads")
                      .default_value("1")
                      .takes_value(true))
+
+                .arg(Arg::with_name("clades")
+                     .long("clades")
+                     .takes_value(true)
+                     .required(true))
 
                 .arg(Arg::with_name("genome-fasta-files")
                      .short("f")
