@@ -20,6 +20,9 @@ use env_logger::Builder;
 #[macro_use]
 extern crate lazy_static;
 
+extern crate rayon;
+use rayon::prelude::*;
+
 // fn contig_full_help() -> &'static str {
 //     "coverm contig: FIXME" 
 // }
@@ -100,6 +103,10 @@ fn main(){
             let output = format!("{}.cockatoo_db", reference);
             let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
 
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(num_threads)
+                .build_global()
+                .expect("Programming error: rayon initialised multiple times");
 
             let genomes_and_contigs = if m.is_present("genome-definition") {
                 let definition_file = m.value_of("genome-definition").unwrap();
@@ -126,10 +133,10 @@ fn main(){
             let clades  = cockatoo::genome_pseudoaligner::read_clade_definition_file(
                 clade_definitions_file);
 
-            // TODO: ProgressBar? Multithread?
+            // TODO: ProgressBar?
             info!("Calculating core genomes ..");
             let nucmer_core_genomes: Vec<Vec<Vec<cockatoo::core_genome::CoreGenomicRegion>>> = clades
-                .iter()
+                .par_iter()
                 .enumerate()
                 .map(
                     |(i, clade_fastas)|
@@ -152,6 +159,7 @@ fn main(){
             let dna_strings = cockatoo::genome_pseudoaligner::read_clade_genome_strings(
                 &clades);
             info!("Threading DeBruijn graph");
+            // TODO: Multithread?
             let core_genome_pseudoaligner = cockatoo::core_genome::generate_core_genome_pseudoaligner(
                 &nucmer_core_genomes,
                 &dna_strings,
