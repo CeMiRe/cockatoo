@@ -265,7 +265,7 @@ pub fn report_core_genome_sizes(
     clades: &Vec<Vec<String>>) {
 
     let mut total_core_genome_size = 0u64;
-    let mut minimum_core_genome_size = None;
+    let mut overall_minimum_core_genome_size = None;
     for (clade_i, core_genomes) in nucmer_core_genomes.iter().enumerate() {
         // minimum core genome size in the clade
         let minimum_of_clade = core_genomes
@@ -274,11 +274,13 @@ pub fn report_core_genome_sizes(
                 |core_genome_regions|
                 core_genome_regions
                     .iter()
-                    .fold(0, |acc,c| acc+c.stop-c.start))
+                    .fold(0, |acc,c| acc+c.stop-c.start+1))
             .min()
             .unwrap();
+        debug!("Core genomes {:#?}", core_genomes);
+        info!("For clade {}, found minimum core genome size {}", clade_i, minimum_of_clade);
         total_core_genome_size += minimum_of_clade as u64;
-        minimum_core_genome_size = match minimum_core_genome_size {
+        overall_minimum_core_genome_size = match overall_minimum_core_genome_size {
             None => Some((clade_i, minimum_of_clade)),
             Some((prev_i, prev_min)) => {
                 if minimum_of_clade < prev_min {
@@ -290,8 +292,8 @@ pub fn report_core_genome_sizes(
         }
     }
     info!("Found minimum core genome size {} from clade {}",
-          minimum_core_genome_size.unwrap().1,
-          clades[minimum_core_genome_size.unwrap().0][0]
+          overall_minimum_core_genome_size.unwrap().1,
+          clades[overall_minimum_core_genome_size.unwrap().0][0]
     );
     info!("Found mean core genome size {}",
           total_core_genome_size as f64 / nucmer_core_genomes.len() as f64);
