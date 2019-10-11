@@ -278,7 +278,12 @@ pub fn report_core_genome_sizes(
             .min()
             .unwrap();
         debug!("Core genomes {:#?}", core_genomes);
-        info!("For clade {}, found minimum core genome size {}", clade_i, minimum_of_clade);
+        info!("Found minimum core genome size {} for clade {}, reference {}", 
+            clade_i, minimum_of_clade, clades[clade_i][0]);
+        if minimum_of_clade < 10000 {
+            warn!("Found dangerously low min core genome size ({}bp) for clade {}, reference {}",
+                minimum_of_clade, clade_i, clades[clade_i][0])
+        }
         total_core_genome_size += minimum_of_clade as u64;
         overall_minimum_core_genome_size = match overall_minimum_core_genome_size {
             None => Some((clade_i, minimum_of_clade)),
@@ -295,7 +300,7 @@ pub fn report_core_genome_sizes(
           overall_minimum_core_genome_size.unwrap().1,
           clades[overall_minimum_core_genome_size.unwrap().0][0]
     );
-    info!("Found mean core genome size {}",
+    info!("Found mean of each clade's minimum core genome size {}",
           total_core_genome_size as f64 / nucmer_core_genomes.len() as f64);
 }
 
