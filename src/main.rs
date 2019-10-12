@@ -95,12 +95,12 @@ fn main(){
                 index, &output);
             info!("Saving complete");
         },
-        Some("debruijn_index_for_genome") => {
-            let m = matches.subcommand_matches("debruijn_index_for_genome").unwrap();
+        Some("index") => {
+            let m = matches.subcommand_matches("index").unwrap();
             set_log_level(m, true);
 
             let reference = m.value_of("reference").unwrap();
-            let output = format!("{}.cockatoo_db", reference);
+            let output = m.value_of("index").unwrap();
             let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
 
             rayon::ThreadPoolBuilder::new()
@@ -130,7 +130,7 @@ fn main(){
             // For each clade, nucmer against the first genome.
             info!("Reading clade definition ..");
             let clade_definitions_file = m.value_of("clades").unwrap();
-            let clades  = cockatoo::genome_pseudoaligner::read_clade_definition_file(
+            let clades = cockatoo::genome_pseudoaligner::read_clade_definition_file(
                 clade_definitions_file);
 
             // TODO: ProgressBar?
@@ -490,6 +490,7 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .long("full-help"))
 
                 .arg(Arg::with_name("index")
+                    .short("-d")
                     .long("index")
                     .required(true)
                     .takes_value(true))
@@ -634,11 +635,16 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .long("quiet")))
 
         .subcommand(
-            SubCommand::with_name("debruijn_index_for_genome")
-                .about("Generate a DeBruijn index file")
+            SubCommand::with_name("index")
+                .about("Generate a mapping index for a collection of genomes")
                 .arg(Arg::with_name("reference")
                      .short("-r")
                      .long("reference")
+                     .takes_value(true)
+                     .required(true))
+                .arg(Arg::with_name("index")
+                     .short("-d")
+                     .long("index")
                      .takes_value(true)
                      .required(true))
                 .arg(Arg::with_name("threads")
@@ -661,7 +667,6 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                          &["genome-fasta-directory","separator","genome-definition"])
                      .takes_value(true))
                 .arg(Arg::with_name("genome-fasta-directory")
-                     .short("d")
                      .long("genome-fasta-directory")
                      .conflicts_with("separator")
                      .conflicts_with("genome-fasta-files")
@@ -720,7 +725,6 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                          &["genome-fasta-directory"])
                      .takes_value(true))
                 .arg(Arg::with_name("genome-fasta-directory")
-                     .short("d")
                      .long("genome-fasta-directory")
                      .conflicts_with("separator")
                      .conflicts_with("genome-fasta-files")

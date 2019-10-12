@@ -280,7 +280,7 @@ pub fn report_core_genome_sizes(
             .unwrap();
         debug!("Core genomes {:#?}", core_genomes);
         info!("Found minimum core genome size {} for clade {}, reference {}", 
-            clade_i, minimum_of_clade, clades[clade_i][0]);
+            minimum_of_clade, clade_i, clades[clade_i][0]);
         if minimum_of_clade < 10000 {
             warn!("Found dangerously low min core genome size ({}bp) for clade {}, reference {}",
                 minimum_of_clade, clade_i, clades[clade_i][0])
