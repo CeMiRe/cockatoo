@@ -173,6 +173,21 @@ fn main(){
             info!("Saving complete");
         },
 
+        Some("index_stats") => {
+            let m = matches.subcommand_matches("index_stats").unwrap();
+            set_log_level(m, true);
+
+            let index_path = m.value_of("index").unwrap();
+            info!("Reading index {} ..", index_path);
+            let index = cockatoo::core_genome::restore_index::<cockatoo::pseudoaligner::config::KmerType>(index_path);
+            info!("Finished reading index");
+
+            println!("clade_id\tcore_genome_size");
+            for (clade_i, size) in index.core_genome_sizes.iter().enumerate() {
+                println!("{}\t{}", clade_i, size);
+            }
+        },
+
         Some("cluster") => {
             let m = matches.subcommand_matches("cluster").unwrap();
             set_log_level(m, true);
@@ -700,6 +715,22 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                         ])
                         .takes_value(true),
                 )
+
+                .arg(Arg::with_name("verbose")
+                     .short("v")
+                     .long("verbose"))
+                .arg(Arg::with_name("quiet")
+                     .short("q")
+                     .long("quiet")))
+
+         .subcommand(
+            SubCommand::with_name("index_stats")
+                .about("Print information about a generated index")
+                .arg(Arg::with_name("index")
+                     .short("-d")
+                     .long("index")
+                     .takes_value(true)
+                     .required(true))
 
                 .arg(Arg::with_name("verbose")
                      .short("v")
