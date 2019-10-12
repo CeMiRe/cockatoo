@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::io::BufWriter;
 use std::fs::File;
 
@@ -338,36 +338,60 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
                 intersect(&mut eq_class, &self.index.eq_classes[color as usize]);
             }
 
-            // Only return colours where visited nodes are marked as core.
-            let mut clade_cores = BTreeSet::new();
+            // Only return colours where all visited nodes are marked as core
+            // for that genome.
+            //
+            // visited_nodes -> node_id_to_clade_cores -> list of core clade ids
+            //
+            // eq_class (list of contig_ids) -> genomes_and_contigs -> genome_id
+            // -> genome_clade_ids -> clade_id
+            //
+            // filter the eq_class - all visited nodes must be core
+            //
+            // First get a set of clade_ids that are tagged in each node.
+            let mut clade_cores = None;
             debug!("Found visited nodes: {:?}", visited_nodes);
-            debug!(
-                "Found sequence of first visited node: {:?}",
-                self.index.dbg.get_node(visited_nodes[0])
-            );
-            debug!("Node id to core genome: {:?}", self.node_id_to_clade_cores);
             for node_id in visited_nodes {
                 match self.node_id_to_clade_cores.get(&node_id) {
-                    None => {}
+                    None => {
+                        clade_cores = None;
+                        break; // no genomes qualify, we are done here.
+                    },
                     Some(clade_ids) => {
-                        for clade_id in clade_ids {
-                            clade_cores.insert(clade_id);
+                        match clade_cores {
+                            None => {
+                                clade_cores = Some(clade_ids.clone())
+                            },
+                            Some(ref mut prev_clade_ids) => {
+                                intersect(prev_clade_ids, clade_ids);
+                            }
                         }
                     }
                 }
             }
-            let core_eq_classes: Vec<u32> = eq_class
-                .into_iter()
-                .filter(|contig_id| {
-                    let contig_name = &self.index.tx_names[*contig_id as usize];
-                    let genome_id = self.genomes_and_contigs.genome_index_of_contig(contig_name)
-                        .expect("Genome name / indexing mismath - programming bug?");
-                    let clade_id: usize = self.genome_clade_ids[genome_id];
-                    clade_cores.contains(&(clade_id as u32))
-                })
-                .collect();
 
-            Some((core_eq_classes, read_coverage))
+            // Then return an eq_class that includes only contigs that are in
+            // clade_cores
+            return match clade_cores {
+                None => Some((vec!(), read_coverage)), // TODO: Necessary?
+                Some(core_clade_ids) => {
+                    let core_eq_classes: Vec<u32> = eq_class
+                        .into_iter()
+                        .filter(|contig_id| {
+                            let contig_name = &self.index.tx_names[*contig_id as usize];
+                            let genome_id = self.genomes_and_contigs.genome_index_of_contig(contig_name)
+                                .expect("Genome name / indexing mismath - programming bug?");
+                            let clade_id: usize = self.genome_clade_ids[genome_id];
+                            // TODO: Guessing here it is best to naively search
+                            // rather than build an indexed set of some
+                            // description, because most lists will be small. True?
+                            core_clade_ids.contains(&(clade_id as u32))
+                        })
+                        .collect();
+
+                    Some((core_eq_classes, read_coverage))
+                }
+            }
         }
     }
 }
@@ -1240,5 +1264,70 @@ mod tests {
         let dna = DnaString::from_acgt_bytes(b"ATCGCCCGTCACCACCCCAATTCA");
         let res = core_aligner.map_read(&dna);
         assert_eq!(Some((vec![], 24usize)), res);
+    }
+    
+    
+    #[test]
+    fn test_core_genome_pseudoaligner_map_non_core_read_some_kmers_core() {
+        init();
+        let cores = vec![
+            vec![vec![
+                CoreGenomicRegion {
+                    clade_id: 0,
+                    contig_id: 0,
+                    start: 1,
+                    stop: 11,
+                },
+                CoreGenomicRegion {
+                    clade_id: 0,
+                    contig_id: 0,
+                    start: 80,
+                    stop: 82,
+                },
+            ]],
+            vec![vec![CoreGenomicRegion {
+                clade_id: 1,
+                contig_id: 0,
+                start: 10,
+                stop: 15,
+            }]],
+        ];
+
+        let geco = coverm::read_genome_definition_file(
+            "tests/data/2_single_species_dummy_dataset/2genomes/each_contig_one_genome.definition");
+
+        // Build index
+        let reference_reader = fasta::Reader::from_file(
+            "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
+        )
+        .expect("reference reading failed.");
+
+        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+            "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
+            1);
+
+        info!("Reading reference sequences in ..");
+        let (mut seqs, _,_) = utils::read_transcripts(
+            reference_reader,
+            |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
+            .expect("Failure to read contigs file");
+
+        let _ = seqs.pop().unwrap();
+        let s1 = seqs.pop().unwrap();
+        let s0 = seqs.pop().unwrap();
+
+        let core_aligner = generate_core_genome_pseudoaligner(
+            &cores,
+            &vec![vec![vec![s0]], vec![vec![s1]]],
+            index,
+            geco,
+        );
+
+        // non-core read (1 kmer) because the A at the start is an overhang.
+        // It's a non-core (rather than not in any genome).
+        let dna = DnaString::from_acgt_bytes(
+            b"ATCGCCCGTCACCACCCCAATTCATA");
+        let res = core_aligner.map_read(&dna);
+        assert_eq!(Some((vec![], 26usize)), res);
     }
 }

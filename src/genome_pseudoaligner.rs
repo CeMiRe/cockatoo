@@ -85,6 +85,7 @@ pub fn calculate_genome_kmer_coverage<K: Kmer + Sync + Send>(
     let genomes_and_contigs = &core_genome_aligner.genomes_and_contigs;
 
     // Do the mappings
+    // TODO: Use a faster fastq reader here and elsewhere
     let reads = fastq::Reader::from_file(forward_fastq)
         .expect(&format!("Failure to read file {}", forward_fastq));
     let reverse_reads = match reverse_fastq {
