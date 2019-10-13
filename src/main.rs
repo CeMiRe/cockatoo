@@ -7,6 +7,7 @@ use cockatoo::external_command_checker; // TODO: check for nucmer
 use std::env;
 use std::str;
 use std::process;
+use std::io::Write;
 
 extern crate clap;
 use clap::*;
@@ -57,7 +58,6 @@ fn main(){
                 pseudoalign_params.num_threads,
                 !m.is_present("no-zeros"),
                 &core_genome_pseudoaligner,
-                m.is_present("write-gfa"),
             );
         },
         Some("contig") => {
@@ -182,6 +182,29 @@ fn main(){
             let index = cockatoo::core_genome::restore_index::<cockatoo::pseudoaligner::config::KmerType>(index_path);
             info!("Finished reading index");
 
+            // Write GFA
+            if m.is_present("gfa") { 
+                let gfa_filename = m.value_of("gfa").unwrap();
+                info!("Writing GFA file {} ..", gfa_filename);
+                let mut gfa_writer = std::fs::File::create(gfa_filename).unwrap();
+                index
+                    .index
+                    .dbg
+                    .write_gfa(&mut gfa_writer)
+                    .expect("Failed to write GFA file");
+
+                // Write CSV data to be loaded into bandage
+                let gfa_csv_filename = format!("{}.core_nodes.csv", gfa_filename);
+                info!("Writing Bandage-compatible core node annotations to {} ..",
+                    gfa_csv_filename);
+                let mut csv_writer = std::fs::File::create(gfa_csv_filename).unwrap();
+                writeln!(csv_writer, "Node,Clades").unwrap();
+                for (node_id, clades) in &index.node_id_to_clade_cores {
+                    writeln!(csv_writer, "{},\"{:?}\"", node_id, clades).unwrap();
+                }
+            }
+
+            // Write info table for each clade
             println!("clade_id\tcore_genome_size");
             for (clade_i, size) in index.core_genome_sizes.iter().enumerate() {
                 println!("{}\t{}", clade_i, size);
@@ -550,8 +573,6 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .default_value("1")
                      .takes_value(true))
 
-                .arg(Arg::with_name("write-gfa")
-                     .long("write-gfa"))
                 .arg(Arg::with_name("no-zeros")
                      .long("no-zeros"))
 
@@ -731,6 +752,10 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .long("index")
                      .takes_value(true)
                      .required(true))
+                
+                .arg(Arg::with_name("gfa")
+                    .long("gfa")
+                    .takes_value(true))
 
                 .arg(Arg::with_name("verbose")
                      .short("v")
