@@ -18,19 +18,8 @@ extern crate env_logger;
 use log::LevelFilter;
 use env_logger::Builder;
 
-#[macro_use]
-extern crate lazy_static;
-
 extern crate rayon;
 use rayon::prelude::*;
-
-// fn contig_full_help() -> &'static str {
-//     "coverm contig: FIXME" 
-// }
-fn genome_full_help() -> &'static str {
-    "coverm genome: FIXME" 
-}
-
 
 fn main(){
     let mut app = build_cli();
@@ -41,10 +30,6 @@ fn main(){
 
         Some("genome") => {
             let m = matches.subcommand_matches("genome").unwrap();
-            if m.is_present("full-help") {
-                println!("{}", genome_full_help());
-                process::exit(1);
-            }
             set_log_level(m, true);
             let pseudoalign_params = parse_pseudoaligner_parameters(&m);
 
@@ -59,41 +44,6 @@ fn main(){
                 !m.is_present("no-zeros"),
                 &core_genome_pseudoaligner,
             );
-        },
-        Some("contig") => {
-            panic!("contig mode has been deprecated, for now.");
-            // let m = matches.subcommand_matches("contig").unwrap();
-            // if m.is_present("full-help") {
-            //     println!("{}", contig_full_help());
-            //     process::exit(1);
-            // }
-            // set_log_level(m, true);
-            // let pseudoalign_params = parse_pseudoaligner_parameters(&m);
-
-            // cockatoo::kmer_coverage::calculate_and_print_contig_kmer_coverages(
-            //     &pseudoalign_params.reads,
-            //     pseudoalign_params.num_threads,
-            //     !m.is_present("no-zeros"),
-            //     &pseudoalign_params.index,
-            // );
-        },
-        Some("debruijn_index_for_contig") => {
-            let m = matches.subcommand_matches("debruijn_index_for_contig").unwrap();
-            set_log_level(m, true);
-
-            let reference = m.value_of("reference").unwrap();
-            let output = format!("{}.covermdb", reference);
-            let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
-
-            info!("Generating DeBruijn index ..");
-            let index = cockatoo::pseudoalignment_reference_readers::generate_debruijn_index_without_groupings::
-            <cockatoo::pseudoaligner::config::KmerType>(
-                reference, num_threads);
-
-            info!("Saving index ..");
-            cockatoo::pseudoalignment_reference_readers::save_index(
-                index, &output);
-            info!("Saving complete");
         },
         Some("index") => {
             let m = matches.subcommand_matches("index").unwrap();
@@ -363,25 +313,6 @@ struct PseudoAlignmentParameters {
     pub reads: Vec<cockatoo::kmer_coverage::PseudoalignmentReadInput>,
 }
 
-// fn parse_contig_index_parameters(
-//     m: &clap::ArgMatches, reference: &str)
-// -> cockatoo::pseudoalignment_reference_readers::
-//     DebruijnIndex<debruijn::kmer::VarIntKmer<u64, debruijn::kmer::K24>> {
-        
-//     let potential_index_file = format!("{}.covermdb", reference);
-//     return match Path::new(&potential_index_file).exists() {
-//         true => {
-//             info!("Using pre-existing index {}", potential_index_file);
-//             cockatoo::pseudoalignment_reference_readers::restore_index::<cockatoo::pseudoaligner::config::KmerType>(
-//                 &potential_index_file)
-//         },
-//         false => {
-//             error!("No pre-existing index file found");
-//             process::exit(1);
-//         }
-//     };
-// }
-
 fn parse_pseudoaligner_parameters(
     m: &clap::ArgMatches)
     -> PseudoAlignmentParameters {
@@ -440,92 +371,16 @@ fn set_log_level(matches: &clap::ArgMatches, is_last: bool) {
 }
 
 fn build_cli() -> App<'static, 'static> {
-    // specify static lazily because need to define it at runtime.
-    lazy_static! {
-        static ref CONTIG_HELP: String = format!(
-            "
-                            {}
-              {}
-
-{}
-
-  coverm contig --coupled read1.fastq.gz read2.fastq.gz --reference assembly.fna
-
-{}
-
-  coverm contig --method metabat --bam-files my.bam
-    --bam-file-cache-directory saved_bam_files
-
-See coverm contig --full-help for further options and further detail.
-",
-            ansi_term::Colour::Green.paint(
-                "coverm contig"),
-            ansi_term::Colour::Green.paint(
-                "Calculate coverage of individual contigs"),
-            ansi_term::Colour::Purple.paint(
-                "Example: Calculate mean coverage from reads and assembly:"),
-            ansi_term::Colour::Purple.paint(
-                "Example: Calculate MetaBAT adjusted coverage from a sorted BAM file, saving
-the unfiltered BAM files in the saved_bam_files folder:")
-        ).to_string();
-
-        static ref GENOME_HELP: String = format!(
-            "
-                            {}
-               {}
-
-{}
-
-  coverm genome --coupled read1.fastq.gz read2.fastq.gz
-    --reference assembly.fna --separator '~'
-
-{}
-
-  coverm genome --bam-files my.bam --genome-fasta-directory genomes_directory/
-
-See coverm genome --full-help for further options and further detail.
-",
-            ansi_term::Colour::Green.paint(
-                "coverm genome"),
-            ansi_term::Colour::Green.paint(
-                "Calculate coverage of individual genomes"),
-            ansi_term::Colour::Purple.paint(
-                "Example: Map paired reads to a reference where the FASTA header separates
-the genome name from the contig name with '~' e.g. >genome10~contig15"),
-            ansi_term::Colour::Purple.paint(
-                "Example: Calculate coverage of genomes defined as .fna files in
-genomes_directory/ from a sorted BAM file:"),
-        ).to_string();
-    }
-
     return App::new("coverm")
         .version(crate_version!())
         .author("Ben J. Woodcroft <benjwoodcroft near gmail.com>")
         .about("Mapping coverage analysis for metagenomics")
         .args_from_usage("-v, --verbose       'Print extra debug logging information'
              -q, --quiet         'Unless there is an error, do not print logging information'")
-        .help("
-Strain-specific coverage analysis for metagenomics
-
-Usage: coverm <subcommand> ...
-
-Main subcommands:
-\tcontig\tCalculate coverage of contigs
-\tgenome\tCalculate coverage of genomes
-
-Other options:
-\t-V, --version\tPrint version information
-
-Ben J. Woodcroft <benjwoodcroft near gmail.com>
-")
         .global_setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("genome")
                 .about("Calculate coverage of genomes")
-                .help(GENOME_HELP.as_str())
-
-                .arg(Arg::with_name("full-help")
-                     .long("full-help"))
 
                 .arg(Arg::with_name("index")
                     .short("-d")
@@ -539,33 +394,33 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                      .takes_value(true)
                      .requires("read2")
                      .required_unless_one(
-                         &["coupled","interleaved","single","full-help"]))
+                         &["coupled","interleaved","single"]))
                 .arg(Arg::with_name("read2")
                      .short("-2")
                      .multiple(true)
                      .takes_value(true)
                      .requires("read1")
                      .required_unless_one(
-                         &["coupled","interleaved","single","full-help"]))
+                         &["coupled","interleaved","single"]))
                 .arg(Arg::with_name("coupled")
                      .short("-c")
                      .long("coupled")
                      .multiple(true)
                      .takes_value(true)
                      .required_unless_one(
-                         &["read1","interleaved","single","full-help"]))
+                         &["read1","interleaved","single"]))
                 .arg(Arg::with_name("interleaved")
                      .long("interleaved")
                      .multiple(true)
                      .takes_value(true)
                      .required_unless_one(
-                         &["read1","coupled","single","full-help"]))
+                         &["read1","coupled","single"]))
                 .arg(Arg::with_name("single")
                      .long("single")
                      .multiple(true)
                      .takes_value(true)
                      .required_unless_one(
-                         &["read1","coupled","interleaved","full-help"])
+                         &["read1","coupled","interleaved"])
                      .conflicts_with("bam-files"))
                 .arg(Arg::with_name("threads")
                      .short("-t")
@@ -575,93 +430,6 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
 
                 .arg(Arg::with_name("no-zeros")
                      .long("no-zeros"))
-
-                .arg(Arg::with_name("verbose")
-                     .short("v")
-                     .long("verbose"))
-                .arg(Arg::with_name("quiet")
-                     .short("q")
-                     .long("quiet")))
-        .subcommand(
-            SubCommand::with_name("contig")
-                .about("Calculate coverage of contigs")
-                .help(CONTIG_HELP.as_str())
-
-                .arg(Arg::with_name("full-help")
-                     .long("full-help"))
-
-                .arg(Arg::with_name("read1")
-                     .short("-1")
-                     .multiple(true)
-                     .takes_value(true)
-                     .requires("read2")
-                     .required_unless_one(
-                         &["bam-files","coupled","interleaved","single","full-help"])
-                     .conflicts_with("bam-files"))
-                .arg(Arg::with_name("read2")
-                     .short("-2")
-                     .multiple(true)
-                     .takes_value(true)
-                     .requires("read1")
-                     .required_unless_one(
-                         &["bam-files","coupled","interleaved","single","full-help"])
-                     .conflicts_with("bam-files"))
-                .arg(Arg::with_name("coupled")
-                     .short("-c")
-                     .long("coupled")
-                     .multiple(true)
-                     .takes_value(true)
-                     .required_unless_one(
-                         &["bam-files","read1","interleaved","single","full-help"])
-                     .conflicts_with("bam-files"))
-                .arg(Arg::with_name("interleaved")
-                     .long("interleaved")
-                     .multiple(true)
-                     .takes_value(true)
-                     .required_unless_one(
-                         &["bam-files","read1","coupled","single","full-help"])
-                     .conflicts_with("bam-files"))
-                .arg(Arg::with_name("single")
-                     .long("single")
-                     .multiple(true)
-                     .takes_value(true)
-                     .required_unless_one(
-                         &["bam-files","read1","coupled","interleaved","full-help"])
-                     .conflicts_with("bam-files"))
-                .arg(Arg::with_name("reference")
-                     .short("-r")
-                     .long("reference")
-                     .takes_value(true)
-                     .multiple(true)
-                     .required_unless_one(&["bam-files","full-help"])
-                     .conflicts_with("bam-files"))
-                .arg(Arg::with_name("threads")
-                     .short("-t")
-                     .long("threads")
-                     .default_value("1")
-                     .takes_value(true))
-                .arg(Arg::with_name("no-zeros")
-                     .long("no-zeros"))
-                .arg(Arg::with_name("verbose")
-                     .short("v")
-                     .long("verbose"))
-                .arg(Arg::with_name("quiet")
-                     .short("q")
-                     .long("quiet")))
-
-        .subcommand(
-            SubCommand::with_name("debruijn_index_for_contig")
-                .about("Generate a DeBruijn index file")
-                .arg(Arg::with_name("reference")
-                     .short("-r")
-                     .long("reference")
-                     .takes_value(true)
-                     .required(true))
-                .arg(Arg::with_name("threads")
-                     .short("-t")
-                     .long("threads")
-                     .default_value("1")
-                     .takes_value(true))
 
                 .arg(Arg::with_name("verbose")
                      .short("v")
@@ -734,8 +502,7 @@ Ben J. Woodcroft <benjwoodcroft near gmail.com>
                             "separator",
                             "genome-fasta-directory",
                         ])
-                        .takes_value(true),
-                )
+                        .takes_value(true))
 
                 .arg(Arg::with_name("verbose")
                      .short("v")
