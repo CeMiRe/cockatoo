@@ -37,7 +37,8 @@ pub struct CoreGenomePseudoaligner<K: Kmer + Send + Sync> {
     /// Pseudoaligner.
     pub contig_names: Vec<String>,
 
-    /// Core genome size of each clade
+    /// Core genome size of each clade. Measured in the number of Kmers, not
+    /// sequence length.
     pub core_genome_sizes: Vec<usize>,
 
     /// List of which clades each genome belongs to
@@ -455,6 +456,7 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
                     contig_id,
                     &genome_regions[region_index_start..region_index_stop],
                 );
+                debug!("Found core node ids: {:?}", core_node_ids);
                 for nid in core_node_ids {
                     match node_id_to_clade_cores.get_mut(&nid) {
                         Some(clade_cores) => {
@@ -467,9 +469,10 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
                         }
                     }
 
-                    // Add the total length of the found nodes to the core genome
-                    // size
-                    core_genome_size += aligner.index.dbg.get_node(nid).len();
+                    // Add the total length of the found nodes to the core
+                    // genome size. Each node's .len() is inflated by k-1
+                    // because of overlaps.
+                    core_genome_size += aligner.index.dbg.get_node(nid).len()-(K::k()-1);
                 }
 
                 // Update for next iteration
@@ -696,11 +699,11 @@ fn thread_and_find_core_nodes<K: Kmer + Send + Sync>(
     debug!("Found entire contig sequence {:?}", contig_sequence);
 
     for _ in 1..last_kmer_pos {
-        debug!("");
-        debug!(
-            "===== Finding kmer at contig position {}",
-            current_position.contig_position
-        );
+        // debug!("");
+        // debug!(
+        //     "===== Finding kmer at contig position {}",
+        //     current_position.contig_position
+        // );
         // if position is in core genome, mark it.
         let mut current_core_region = &core_regions[current_core_region_idx];
         if current_core_region.start <= current_position.contig_position {
@@ -713,7 +716,7 @@ fn thread_and_find_core_nodes<K: Kmer + Send + Sync>(
                     break;
                 }
             }
-            debug!("In core region or just coming out of one ..");
+            // debug!("In core region or just coming out of one ..");
 
             // If we are in the range of the next core region, add this node
             current_core_region = &core_regions[current_core_region_idx];
@@ -721,7 +724,7 @@ fn thread_and_find_core_nodes<K: Kmer + Send + Sync>(
                 None => {}
                 Some(pos) => {
                     if current_core_region.start <= current_position.contig_position {
-                        debug!("Marking as core the current node {}", pos.node_id);
+                        // debug!("Marking as core the current node {}", pos.node_id);
                         match last_node_id {
                             Some(nid) => {
                                 if pos.node_id != nid {
@@ -742,7 +745,7 @@ fn thread_and_find_core_nodes<K: Kmer + Send + Sync>(
         let current_contig_position = current_position.contig_position as usize;
         let target_kmer = contig_sequence.get_kmer::<K>(current_contig_position + 1);
         next_position(&mut current_position, &aligner, &target_kmer);
-        debug!("next_position: {:?}", current_position);
+        // debug!("next_position: {:?}", current_position);
 
         // Double check that the sequence now has the right kmer in that
         // position.
@@ -751,9 +754,9 @@ fn thread_and_find_core_nodes<K: Kmer + Send + Sync>(
                 let found_sequence = aligner.dbg.get_node(pos.node_id as usize).sequence();
                 // Found_kmer is a DnaStringSlice
                 let mut found_kmer = found_sequence.get_kmer::<K>(pos.offset as usize);
-                debug!("Before potential rc(), forward found was {:?}", found_kmer);
+                // debug!("Before potential rc(), forward found was {:?}", found_kmer);
                 if !pos.is_forward {
-                    debug!("not is_forward");
+                    // debug!("not is_forward");
                     found_kmer = found_kmer.rc();
                 }
                 if found_kmer != target_kmer {
@@ -763,7 +766,7 @@ fn thread_and_find_core_nodes<K: Kmer + Send + Sync>(
                     );
                     true
                 } else {
-                    debug!("Found kmer was correct");
+                    // debug!("Found kmer was correct");
                     false
                 }
             }
@@ -785,7 +788,7 @@ fn next_position<K: Kmer + Send + Sync>(
     kmer: &K,
 ) {
     let k = K::k();
-    debug!("Finding kmer {:?}", kmer);
+    // debug!("Finding kmer {:?}", kmer);
 
     // If we are lost in the graph, then try to find our way by kmer. If still
     // lost, so be it.
@@ -794,17 +797,17 @@ fn next_position<K: Kmer + Send + Sync>(
         Some(ref mut position) => {
             // If we are in the middle of the node, then just update the offset
             let current_node = aligner.dbg.get_node(position.node_id as usize);
-            debug!(
-                "Current node {}'s sequence is {:?}",
-                position.node_id,
-                current_node.sequence()
-            );
+            // debug!(
+            //     "Current node {}'s sequence is {:?}",
+            //     position.node_id,
+            //     current_node.sequence()
+            // );
             if position.is_forward && position.offset as usize + k < current_node.len() {
-                debug!("Just going forward on the same node");
+                // debug!("Just going forward on the same node");
                 position.offset += 1;
                 updated = true;
             } else if !position.is_forward && position.offset > 0 {
-                debug!("Just going reverse on the same node");
+                // debug!("Just going reverse on the same node");
                 position.offset -= 1;
                 updated = true;
             }
@@ -817,15 +820,15 @@ fn next_position<K: Kmer + Send + Sync>(
         // position by finding the kmer. I imagine we can also do this by
         // following the connections in the graph, but I had trouble coding
         // that.
-        debug!("Threading contig to a new node ..");
+        // debug!("Threading contig to a new node ..");
 
         match kmer_to_node_and_offset(aligner, kmer) {
             None => {
-                debug!("Current kmer could not be threaded: {:?}", kmer);
+                // debug!("Current kmer could not be threaded: {:?}", kmer);
                 position.graph_position = None;
             }
             Some((node_id, offset)) => {
-                debug!("Found starting kmer at node/offset {}/{}", node_id, offset);
+                // debug!("Found starting kmer at node/offset {}/{}", node_id, offset);
                 // TODO: Seem to be flipping back and forth between u32 and
                 // usize. Can we standardise?
                 position.graph_position = Some(DBGraphPosition {
@@ -836,13 +839,13 @@ fn next_position<K: Kmer + Send + Sync>(
                         // TODO: Do we know this already when we are searching for the
                         // kmer, so below can be replaced with that knowledge?
                         let node = aligner.dbg.get_node(node_id as usize);
-                        debug!("Found node sequence was: {:?}", node.sequence());
+                        // debug!("Found node sequence was: {:?}", node.sequence());
                         let ref_kmer: K = node.sequence().get_kmer(offset as usize);
                         if kmer == &ref_kmer {
-                            debug!("setting is_forward true");
+                            // debug!("setting is_forward true");
                             true
                         } else if kmer.rc() == ref_kmer {
-                            debug!("setting is_forward false");
+                            // debug!("setting is_forward false");
                             false
                         } else {
                             panic!("Not sure what is going on")
@@ -971,7 +974,7 @@ mod tests {
             core_aligner.index.dbg.get_node(4).len(),
             core_aligner.index.dbg.get_node(5).len()
         );
-        assert_eq!(vec![71], core_aligner.core_genome_sizes);
+        assert_eq!(vec![71-23-23], core_aligner.core_genome_sizes);
     }
 
     #[test]
@@ -1046,7 +1049,7 @@ mod tests {
             core_aligner.index.dbg.get_node(4).len(),
             core_aligner.index.dbg.get_node(5).len()
         );
-        assert_eq!(vec![99 + 47 + 24, 99], core_aligner.core_genome_sizes);
+        assert_eq!(vec![99 + 47 + 24 -23-23-23, 99-23], core_aligner.core_genome_sizes);
     }
 
     #[test]
@@ -1110,7 +1113,7 @@ mod tests {
             core_aligner.index.dbg.get_node(0).len(),
             core_aligner.index.dbg.get_node(1).len()
         );
-        assert_eq!(vec![73, 73], core_aligner.core_genome_sizes);
+        assert_eq!(vec![73-23, 73-23], core_aligner.core_genome_sizes);
     }
 
     #[test]

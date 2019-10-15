@@ -100,8 +100,6 @@ fn main(){
             cockatoo::genome_pseudoaligner::report_core_genome_sizes(
                 &nucmer_core_genomes, &clades);
 
-            debug!("Found core genomes: {:#?}", nucmer_core_genomes);
-
             // Thread genomes recording the core genome nodes
             // TODO: These data are at least sometimes read in repeatedly, when they
             // maybe should just be cached or something.

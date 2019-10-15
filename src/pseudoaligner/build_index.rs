@@ -30,7 +30,8 @@ pub fn build_index<K: Kmer + Sync + Send>(
     // Thread pool Configuration for calling BOOMphf
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
-        .build()?;
+        .build()
+        .expect("Programming error - failed to initialize the rayon threadpool");
 
     if seqs.len() >= U32_MAX {
         panic!("Too many ({}) sequences to handle.", seqs.len());
