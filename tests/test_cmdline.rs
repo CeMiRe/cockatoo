@@ -123,21 +123,27 @@ mod tests {
 
     #[test]
     fn test_genome_kmer_two_genomes_paired_input() {
+        let index = make_index(
+            "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.different_clades",
+            "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna",
+            "tests/data/2_single_species_dummy_dataset/two_genomes_tsv"
+        );
         Assert::main_binary()
             .with_args(&[
                 "genome",
                 "-c",
                 "tests/data/2_single_species_dummy_dataset/genome1_read_over100bp.1.fq",
                 "tests/data/2_single_species_dummy_dataset/genome1_read_over100bp_one_bp_shorter.1.fq",
-                "-r",
-                "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna",
-                "--genome-definition",
-                "tests/data/2_single_species_dummy_dataset/two_genomes_tsv"])
+                "-d",
+                index.path().to_str().unwrap()])
             .succeeds()
-            .stdout().is(
+            .stdout().is(format!(
                 "Sample	Genome	Coverage\n\
-                 tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna/tests/data/2_single_species_dummy_dataset/genome1_read_over100bp.1.fq	g1	0.35\n\
-                 tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna/tests/data/2_single_species_dummy_dataset/genome1_read_over100bp.1.fq	g2	0\n")
+                 {}/tests/data/2_single_species_dummy_dataset/genome1_read_over100bp.1.fq	g1	0.3954802259887006\n\
+                 {}/tests/data/2_single_species_dummy_dataset/genome1_read_over100bp.1.fq	g2	0\n",
+                 index.path().to_str().unwrap(),
+                 index.path().to_str().unwrap())
+                 .as_str())
             .unwrap()
     }
 
