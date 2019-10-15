@@ -114,6 +114,7 @@ fn main(){
                 index,
                 genomes_and_contigs,
             );
+            debug!("Found index {:?}", core_genome_pseudoaligner);
 
             info!("Saving index ..");
             cockatoo::core_genome::save_index(

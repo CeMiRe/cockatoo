@@ -415,7 +415,7 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
     let indices_of_current_contig =
         |regions: &Vec<CoreGenomicRegion>, starting_index: usize| -> (usize, usize) {
             let target_contig_id = regions[starting_index].contig_id;
-            let mut i = starting_index + 1;
+            let mut i = starting_index+1;
             while i < regions.len() {
                 if regions[i].contig_id == target_contig_id {
                     i += 1;
@@ -476,8 +476,9 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
                 }
 
                 // Update for next iteration
-                if region_index_stop + 1 < genome_regions.len() {
-                    let nexts = indices_of_current_contig(genome_regions, region_index_stop + 1);
+                debug!("region_index start {}, stop {}", region_index_start, region_index_stop);
+                if region_index_stop < genome_regions.len() {
+                    let nexts = indices_of_current_contig(genome_regions, region_index_stop);
                     region_index_start = nexts.0;
                     region_index_stop = nexts.1;
                 } else {

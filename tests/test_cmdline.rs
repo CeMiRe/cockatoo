@@ -85,12 +85,12 @@ mod tests {
                 index.path().to_str().unwrap()
                 ])
             .succeeds()
-            // This seems to be a legitimate problem. Genome length is incorrect, maybe because repeats are only counted once?
+            // TODO: The test value here is actually wrong - this seems to be a legitimate problem. Genome length is incorrect because repeats are only counted once.
             .stdout()
             .is(
                 format!(
                     "Sample	Genome	Coverage\n\
-                    {}/tests/data/2_single_species_dummy_dataset/reads/2genomes_2_reads.fq	g	0.226\n",
+                    {}/tests/data/2_single_species_dummy_dataset/reads/2genomes_2_reads.fq	g	0.2488986784140969\n",
                     index.path().to_str().unwrap())
                     .as_str())
             .unwrap()
