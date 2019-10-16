@@ -8,6 +8,11 @@ pub mod nucmer_runner;
 pub mod nucmer_core_genome_generator;
 pub mod ani_clustering;
 pub mod pseudoalignment_reference_readers;
+pub mod mapping_parameters;
+
+// Modules below shared as direct code copy between coverm and cockatoo
+pub mod genomes_and_contigs;
+pub mod genome_parsing;
 
 extern crate bio;
 #[macro_use]
@@ -31,8 +36,6 @@ extern crate serde;
 extern crate csv;
 extern crate rstar;
 extern crate finch;
-
-extern crate coverm;
 
 use std::io::Read;
 

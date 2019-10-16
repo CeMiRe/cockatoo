@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use kmer_coverage::*;
-use coverm::genomes_and_contigs::GenomesAndContigs;
+use genomes_and_contigs::GenomesAndContigs;
 use core_genome::{CoreGenomePseudoaligner,CoreGenomicRegion};
 
 use pseudoaligner::*;

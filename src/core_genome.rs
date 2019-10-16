@@ -14,7 +14,7 @@ use pseudoaligner::config::LEFT_EXTEND_FRACTION;
 use pseudoaligner::pseudoaligner::intersect;
 
 use pseudoalignment_reference_readers::DebruijnIndex;
-use coverm::genomes_and_contigs::GenomesAndContigs;
+use genomes_and_contigs::GenomesAndContigs;
 
 
 // A region marked as being core for a clade
@@ -865,7 +865,7 @@ mod tests {
     use bio::io::fasta;
     use pseudoaligner::*;
     use pseudoalignment_reference_readers::*;
-    use coverm::read_genome_fasta_files;
+    use genome_parsing::*;
 
     fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -1004,7 +1004,7 @@ mod tests {
             }]],
         ];
 
-        let geco = coverm::read_genome_definition_file(
+        let geco = read_genome_definition_file(
             "tests/data/2_single_species_dummy_dataset/2genomes/each_contig_one_genome.definition");
 
         // Build index
@@ -1071,7 +1071,7 @@ mod tests {
             }],
         ]];
 
-        let geco = coverm::read_genome_definition_file(
+        let geco = read_genome_definition_file(
             "tests/data/2_single_species_dummy_dataset/two_genomes_tsv");
 
         // Build index
@@ -1172,7 +1172,7 @@ mod tests {
             }]],
         ];
 
-        let geco = coverm::read_genome_definition_file(
+        let geco = read_genome_definition_file(
             "tests/data/2_single_species_dummy_dataset/2genomes/each_contig_one_genome.definition");
 
         // Build index
@@ -1233,7 +1233,7 @@ mod tests {
             }]],
         ];
 
-        let geco = coverm::read_genome_definition_file(
+        let geco = read_genome_definition_file(
             "tests/data/2_single_species_dummy_dataset/2genomes/each_contig_one_genome.definition");
 
         // Build index
@@ -1297,7 +1297,7 @@ mod tests {
             }]],
         ];
 
-        let geco = coverm::read_genome_definition_file(
+        let geco = read_genome_definition_file(
             "tests/data/2_single_species_dummy_dataset/2genomes/each_contig_one_genome.definition");
 
         // Build index

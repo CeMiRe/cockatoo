@@ -1,8 +1,6 @@
 extern crate cockatoo;
 
-extern crate coverm;
-//use coverm::CONCATENATED_FASTA_FILE_SEPARATOR;
-use coverm::mapping_parameters::MappingParameters;
+use cockatoo::mapping_parameters::MappingParameters;
 use cockatoo::external_command_checker; // TODO: check for nucmer
 use std::env;
 use std::str;
@@ -61,11 +59,11 @@ fn main(){
             let genomes_and_contigs = if m.is_present("genome-definition") {
                 let definition_file = m.value_of("genome-definition").unwrap();
                 info!("Reading contig names associated with each genome from {}..", definition_file);
-                coverm::read_genome_definition_file(&definition_file)
+                cockatoo::genome_parsing::read_genome_definition_file(&definition_file)
             } else {
                 let genome_fasta_files: Vec<String> = parse_list_of_genome_fasta_files(m);
                 info!("Reading contig names for {} genomes ..", genome_fasta_files.len());
-                coverm::read_genome_fasta_files(
+                cockatoo::genome_parsing::read_genome_fasta_files(
                     &genome_fasta_files.iter().map(|s| s.as_str()).collect())
             };
 
@@ -194,8 +192,7 @@ fn main(){
 
             // Not really mapping parameters but gets the job done
             // TODO: Remove coverm from this and do our own thing. That'd cut out the rust-htslib too.
-            let read_inputs = MappingParameters::generate_from_clap(
-                &m, coverm::bam_generator::MappingProgram::BWA_MEM, &None);
+            let read_inputs = MappingParameters::generate_from_clap(&m, &None);
             let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
 
             external_command_checker::check_for_mash();
@@ -319,8 +316,7 @@ fn parse_pseudoaligner_parameters(
     let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
     let index = m.value_of("index").unwrap();
 
-    let mapping_parameters = MappingParameters::generate_from_clap(
-        &m, coverm::bam_generator::MappingProgram::BWA_MEM, &None);
+    let mapping_parameters = MappingParameters::generate_from_clap(&m, &None);
 
     let mut pseudoalignment_read_input = vec!();
     // TODO: Accept interleaved output here, in genome and in screen

@@ -33,8 +33,6 @@ snap = "0.2"
 csv = "1.1"
 rstar = "0.5"
 finch = { git = "https://github.com/onecodex/finch-rs", rev = "5dc21d072c0bbd758532eff70871d101ed69e573" } # So mash_files can work in parallel. Presumably will be integrated in v0.3
-coverm = { git = "https://github.com/wwood/CoverM", rev = "696cadef1a92468eb51b0ac693058165283df715" }
-#coverm = { path = "../coverm" }
 
 [dev-dependencies]
 assert_cli = "0.6.*"
