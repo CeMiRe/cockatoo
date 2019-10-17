@@ -2,6 +2,7 @@
 // use std::io::Read;
 // use std::path::Path;
 use std::collections::BTreeMap;
+use rayon::prelude::*;
 
 use run_command_safely;
 use nucmer_runner;
@@ -190,7 +191,7 @@ fn generate_nucmer_alignments(
 ) -> Vec<Vec<nucmer_runner::NucmerDeltaAlignment>> {
 
     return query_fasta_paths
-        .iter()
+        .par_iter()
         .map(|q| nucmer_runner::nucmer_to_deltas(
             reference_suffix_prefix_str,
             reference_fasta,
