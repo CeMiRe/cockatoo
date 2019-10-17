@@ -105,7 +105,6 @@ fn main(){
             let dna_strings = cockatoo::genome_pseudoaligner::read_clade_genome_strings(
                 &clades);
             info!("Threading DeBruijn graph");
-            // TODO: Multithread?
             let core_genome_pseudoaligner = cockatoo::core_genome::generate_core_genome_pseudoaligner(
                 &nucmer_core_genomes,
                 &dna_strings,

@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
 use std::io::BufWriter;
 use std::fs::File;
+use std::sync::Mutex;
 
 use debruijn::dna_string::DnaString;
 use debruijn::{Dir, Kmer, Mer, Vmer};
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use bincode;
+use rayon::prelude::*;
 
 use pseudoaligner::pseudoaligner::Pseudoaligner;
 use pseudoaligner::pseudoaligner::PseudoalignmentReadMapper;
@@ -406,9 +408,9 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
     aligner: DebruijnIndex<K>,
     genomes_and_contigs: GenomesAndContigs,
 ) -> CoreGenomePseudoaligner<K> {
-    let mut node_id_to_clade_cores: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
-    let mut genome_clade_ids: Vec<usize> = vec![];
-    let mut core_genome_sizes: Vec<usize> = vec![];
+    let node_id_to_clade_cores: Mutex<BTreeMap<usize, Vec<u32>>> = Mutex::new(BTreeMap::new());
+    let genome_clade_ids: Mutex<Vec<usize>> = Mutex::new(vec![]);
+    let core_genome_sizes: Mutex<Vec<usize>> = Mutex::new(vec![]);
 
     // Function to extract the next tranch of core genome regions for the next
     // contig
@@ -426,11 +428,11 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
             (starting_index, i)
         };
 
-    for (clade_id_usize, clade_core_genomes) in core_genome_regions.iter().enumerate() {
+    core_genome_regions.into_par_iter().enumerate().for_each ( |(clade_id_usize, clade_core_genomes)| {
         let clade_id = clade_id_usize as u32;
         for (genome_id, genome_regions) in clade_core_genomes.iter().enumerate() {
             assert_eq!(clade_id_usize, genome_regions[0].clade_id as usize);
-            genome_clade_ids.push(clade_id_usize);
+            genome_clade_ids.lock().expect("lock poisoned by different thread").push(clade_id_usize);
             let mut core_genome_size = 0usize;
 
             let (mut region_index_start, mut region_index_stop) =
@@ -457,22 +459,26 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
                     &genome_regions[region_index_start..region_index_stop],
                 );
                 debug!("Found core node ids: {:?}", core_node_ids);
-                for nid in core_node_ids {
-                    match node_id_to_clade_cores.get_mut(&nid) {
-                        Some(clade_cores) => {
-                            if clade_cores.iter().find(|&r| *r == clade_id).is_none() {
-                                clade_cores.push(clade_id)
-                            };
+                {
+                    let mut unlocked_core_node_ids = node_id_to_clade_cores
+                        .lock().expect("lock poisoned by different thread");
+                    for nid in core_node_ids {
+                        match unlocked_core_node_ids.get_mut(&nid) {
+                            Some(clade_cores) => {
+                                if clade_cores.iter().find(|&r| *r == clade_id).is_none() {
+                                    clade_cores.push(clade_id)
+                                };
+                            }
+                            None => {
+                                unlocked_core_node_ids.insert(nid, vec![clade_id]);
+                            }
                         }
-                        None => {
-                            node_id_to_clade_cores.insert(nid, vec![clade_id]);
-                        }
-                    }
 
-                    // Add the total length of the found nodes to the core
-                    // genome size. Each node's .len() is inflated by k-1
-                    // because of overlaps.
-                    core_genome_size += aligner.index.dbg.get_node(nid).len()-(K::k()-1);
+                        // Add the total length of the found nodes to the core
+                        // genome size. Each node's .len() is inflated by k-1
+                        // because of overlaps.
+                        core_genome_size += aligner.index.dbg.get_node(nid).len()-(K::k()-1);
+                    }
                 }
 
                 // Update for next iteration
@@ -486,16 +492,16 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
                     break;
                 }
             }
-            core_genome_sizes.push(core_genome_size);
+            core_genome_sizes.lock().expect("poisoned lock").push(core_genome_size);
         }
-    }
+    });
 
     return CoreGenomePseudoaligner {
         index: aligner.index,
         contig_names: aligner.tx_names,
-        core_genome_sizes: core_genome_sizes,
-        genome_clade_ids: genome_clade_ids,
-        node_id_to_clade_cores: node_id_to_clade_cores,
+        core_genome_sizes: core_genome_sizes.into_inner().unwrap(),
+        genome_clade_ids: genome_clade_ids.into_inner().unwrap(),
+        node_id_to_clade_cores: node_id_to_clade_cores.into_inner().unwrap(),
         genomes_and_contigs: genomes_and_contigs,
     };
 }
