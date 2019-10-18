@@ -1,12 +1,13 @@
 // Copyright (c) 2018 10x Genomics, Inc. All rights reserved.
 
-use std::{self, cmp::Ordering, fs::File, str};
+use std::{self, cmp::Ordering, str};
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::sync::{mpsc, Arc, Mutex};
 use std::collections::BTreeMap;
+use std::io::Read;
 
-use bio::io::fastq;
+use seq_io::fastq;
 use boomphf::hashmap::NoKeyBoomHashMap;
 use crossbeam;
 use debruijn::dna_string::DnaString;
@@ -323,9 +324,9 @@ pub fn intersect<T: Eq + Ord>(v1: &mut Vec<T>, v2: &[T]) {
 
 // TODO: Generalise this to take gzipping fastq, fasta etc, and use a faster
 // reader.
-pub fn process_reads<K: Kmer + Sync + Send, T: PseudoalignmentReadMapper + Sync + Send>(
-    forward_or_single_reader: fastq::Reader<File>,
-    reverse_reader: Option<fastq::Reader<File>>,
+pub fn process_reads<K: Kmer + Sync + Send, T: PseudoalignmentReadMapper + Sync + Send, R: Read + Sync + Send>(
+    mut forward_or_single_reader: fastq::Reader<R>,
+    mut reverse_reader: Option<fastq::Reader<R>>,
     index: &T,
     num_threads: usize,
     // Result returned is equivalence class indices mapped to indexes, and
@@ -338,7 +339,7 @@ pub fn process_reads<K: Kmer + Sync + Send, T: PseudoalignmentReadMapper + Sync 
 
     let mapping_pairs = reverse_reader.is_some();
     let atomic_readers = match reverse_reader {
-        Some(s) => Arc::new(Mutex::new(
+        Some(ref mut s) => Arc::new(Mutex::new(
                 (forward_or_single_reader.records(),
                  Some(s.records()))
         )),
@@ -466,15 +467,15 @@ pub fn process_reads<K: Kmer + Sync + Send, T: PseudoalignmentReadMapper + Sync 
 }
 
 fn get_next_first_record<R: io::Read>(
-    reader: &Arc<Mutex<(fastq::Records<R>, Option<fastq::Records<R>>)>>,
-) -> Option<Result<fastq::Record, io::Error>> {
+    reader: &Arc<Mutex<(fastq::RecordsIter<R>, Option<fastq::RecordsIter<R>>)>>,
+) -> Option<Result<fastq::OwnedRecord, seq_io::fastq::Error>> {
     let mut lock = reader.lock().unwrap();
     lock.0.next()
 }
 
 fn get_next_record_pair<R: io::Read>(
-    reader: &Arc<Mutex<(fastq::Records<R>, Option<fastq::Records<R>>)>>,
-) -> Option<Result<(fastq::Record, fastq::Record), io::Error>> {
+    reader: &Arc<Mutex<(fastq::RecordsIter<R>, Option<fastq::RecordsIter<R>>)>>,
+) -> Option<Result<(fastq::OwnedRecord, fastq::OwnedRecord), seq_io::fastq::Error>> {
     let mut lock = reader.lock().unwrap();
     let f = lock.0.next();
     let r = match lock.1 {
@@ -526,9 +527,9 @@ fn add_coverage(c: &Option<(std::vec::Vec<u32>, usize)>)
 }
 
 
-fn map_read_pair<T: PseudoalignmentReadMapper>(
-    fwd_record: &fastq::Record,
-    rev_record: &fastq::Record,
+fn map_read_pair<T: PseudoalignmentReadMapper, Q: fastq::Record>(
+    fwd_record: &Q,
+    rev_record: &Q,
     index: &T)
     -> (bool, String, Vec<u32>, usize) {
 
@@ -550,11 +551,14 @@ fn map_read_pair<T: PseudoalignmentReadMapper>(
     debug!("Found mapping f/r mapping coverages for pair: {}/{}",
            forward_mapping_coverage, reverse_mapping_coverage);
 
+    // TODO: Maybe calculating the read_name isn't needed
+    let read_name = fwd_record.id().to_owned().expect("UTF-8 parsing error in read name").to_string();
+
     return if forward_mapping_coverage > reverse_mapping_coverage {
         if forward_mapping_coverage > READ_COVERAGE_THRESHOLD*2 {
             // Mapped read pair in sense direction
             (true,
-             fwd_record.id().to_owned(),
+             read_name,
              match (fwd_fwd_classes, rev_rev_classes) {
                  (Some((mut f_eq_class, _)), Some((r_eq_class, _))) => {
                      // Intersect operates in place
@@ -568,13 +572,13 @@ fn map_read_pair<T: PseudoalignmentReadMapper>(
              forward_mapping_coverage)
         } else {
             // Don't waste time calculating unused info here
-            (false, fwd_record.id().to_owned(), vec![], 0)
+            (false, read_name, vec![], 0)
         }
     } else {
         if reverse_mapping_coverage > READ_COVERAGE_THRESHOLD*2 {
             // Mapped read pair in sense direction
             (true,
-             fwd_record.id().to_owned(),
+             read_name,
              match (fwd_rev_classes, rev_fwd_classes) {
                  (Some((mut f_eq_class, _)), Some((r_eq_class, _))) => {
                      // Intersect operates in place
@@ -588,7 +592,7 @@ fn map_read_pair<T: PseudoalignmentReadMapper>(
              reverse_mapping_coverage)
         } else {
             // Don't waste time calculating unused info here
-            (false, fwd_record.id().to_owned(), vec![], 0)
+            (false, read_name, vec![], 0)
         }
     };
 }
@@ -596,20 +600,21 @@ fn map_read_pair<T: PseudoalignmentReadMapper>(
 
 
 
-fn map_single_reads<T: PseudoalignmentReadMapper>(
-    record: &fastq::Record,
+fn map_single_reads<T: PseudoalignmentReadMapper, Q: fastq::Record>(
+    record: &Q,
     index: &T)
     -> (bool, String, Vec<u32>, usize)  {
 
     let seq = str::from_utf8(record.seq()).unwrap();
     let (fwd_classes, rev_classes) = calculate_fwd_rev(seq, index);
+    let read_name = record.id().to_owned().expect("UTF-8 parsing error in read name").to_string();
 
     return match (fwd_classes, rev_classes) {
         (None, Some((eq_class, coverage))) | (Some((eq_class, coverage)), None) => {
             if coverage >= READ_COVERAGE_THRESHOLD && !eq_class.is_empty() {
-                (true, record.id().to_owned(), eq_class, coverage)
+                (true, read_name, eq_class, coverage)
             } else {
-                (false, record.id().to_owned(), eq_class, coverage)
+                (false, read_name, eq_class, coverage)
             }
         },
         (Some((eq_class_fwd, coverage_fwd)),
@@ -619,35 +624,35 @@ fn map_single_reads<T: PseudoalignmentReadMapper>(
                 (false, false) => {
                     if coverage_fwd > coverage_rev {
                         if coverage_fwd > READ_COVERAGE_THRESHOLD {
-                            (true, record.id().to_owned(), eq_class_fwd, coverage_fwd)
+                            (true, read_name, eq_class_fwd, coverage_fwd)
                         } else {
-                            (false, record.id().to_owned(), eq_class_fwd, coverage_fwd)
+                            (false, read_name, eq_class_fwd, coverage_fwd)
                         }
                     } else {
                         if coverage_rev > READ_COVERAGE_THRESHOLD {
-                            (true, record.id().to_owned(), eq_class_rev, coverage_rev)
+                            (true, read_name, eq_class_rev, coverage_rev)
                         } else {
-                            (false, record.id().to_owned(), eq_class_rev, coverage_rev)
+                            (false, read_name, eq_class_rev, coverage_rev)
                         }
                     }
                 },
                 (true, false) => {
                     if coverage_fwd > READ_COVERAGE_THRESHOLD {
-                        (true, record.id().to_owned(), eq_class_fwd, coverage_fwd)
+                        (true, read_name, eq_class_fwd, coverage_fwd)
                     } else {
-                        (false, record.id().to_owned(), eq_class_fwd, coverage_fwd)
+                        (false, read_name, eq_class_fwd, coverage_fwd)
                     }
                 },
                 (false, true) => {
                     if coverage_rev > READ_COVERAGE_THRESHOLD {
-                        (true, record.id().to_owned(), eq_class_rev, coverage_rev)
+                        (true, read_name, eq_class_rev, coverage_rev)
                     } else {
-                        (false, record.id().to_owned(), eq_class_rev, coverage_rev)
+                        (false, read_name, eq_class_rev, coverage_rev)
                     }
                 },
-                (true, true) => (false, record.id().to_owned(), Vec::new(), 0)
+                (true, true) => (false, read_name, Vec::new(), 0)
             }
         },
-        (None, None) => (false, record.id().to_owned(), Vec::new(), 0)
+        (None, None) => (false, read_name, Vec::new(), 0)
     }
 }

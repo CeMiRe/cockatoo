@@ -496,12 +496,18 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
         }
     });
 
+    // For reproducibility (and ease of testing) sort each of the clade_core lists
+    let mut inner_node_id_to_clade_cores = node_id_to_clade_cores.into_inner().unwrap();
+    for (_node_id, clade_ids) in inner_node_id_to_clade_cores.iter_mut() {
+        clade_ids.sort_unstable();
+    }
+
     return CoreGenomePseudoaligner {
         index: aligner.index,
         contig_names: aligner.tx_names,
         core_genome_sizes: core_genome_sizes.into_inner().unwrap(),
         genome_clade_ids: genome_clade_ids.into_inner().unwrap(),
-        node_id_to_clade_cores: node_id_to_clade_cores.into_inner().unwrap(),
+        node_id_to_clade_cores: inner_node_id_to_clade_cores,
         genomes_and_contigs: genomes_and_contigs,
     };
 }

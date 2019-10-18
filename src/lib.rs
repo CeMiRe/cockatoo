@@ -36,6 +36,7 @@ extern crate serde;
 extern crate csv;
 extern crate rstar;
 extern crate finch;
+extern crate seq_io;
 
 use std::io::Read;
 

@@ -33,6 +33,7 @@ snap = "0.2"
 csv = "1.1"
 rstar = "0.5"
 finch = { git = "https://github.com/onecodex/finch-rs", rev = "5dc21d072c0bbd758532eff70871d101ed69e573" } # So mash_files can work in parallel. Presumably will be integrated in v0.3
+seq_io = { git = "https://github.com/wwood/seq_io", rev = "62a21f22b915ee70495ba242c994ea2f5b3a024c" } # so can read gzip fastq files
 
 [dev-dependencies]
 assert_cli = "0.6.*"

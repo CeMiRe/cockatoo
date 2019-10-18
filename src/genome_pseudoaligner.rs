@@ -8,9 +8,10 @@ use core_genome::{CoreGenomePseudoaligner,CoreGenomicRegion};
 use pseudoaligner::*;
 use debruijn::Kmer;
 use debruijn::dna_string::DnaString;
-use bio::io::{fasta,fastq};
+use bio::io::fasta;
 use log::Level;
 use csv;
+use seq_io::fastq;
 
 /// Given a path to a file containing two columns (representative<tab>member),
 /// where representative and member are paths to genome files, return a list of
@@ -86,18 +87,67 @@ pub fn calculate_genome_kmer_coverage<K: Kmer + Sync + Send>(
 
     // Do the mappings
     // TODO: Use a faster fastq reader here and elsewhere
-    let reads = fastq::Reader::from_file(forward_fastq)
+    let reads = fastq::Reader::from_maybe_gzip_path(Path::new(forward_fastq))
         .expect(&format!("Failure to read file {}", forward_fastq));
     let reverse_reads = match reverse_fastq {
         Some(s) => Some(
-            fastq::Reader::from_file(s)
+            fastq::Reader::from_maybe_gzip_path(Path::new(s))
                 .expect(&format!("Failure to read reverse read file {}", s))),
         None => None
     };
-    let (eq_class_indices, eq_class_coverages, _eq_class_counts) =
-        pseudoaligner::process_reads::<K, CoreGenomePseudoaligner<K>>(
-            reads, reverse_reads, &core_genome_aligner, num_threads)
-        .expect("Failure during mapping process");
+    // TODO: This destructiring is gross - change seq_io ?
+    let (eq_class_indices, eq_class_coverages, _eq_class_counts) = match reverse_reads {
+        None => {
+            match reads {
+                fastq::PotentiallyGzipFastqReader::PlainReader { reader: fwd_reader } => {
+                    pseudoaligner::process_reads::<K, CoreGenomePseudoaligner<K>, _>(
+                        fwd_reader,
+                        None,
+                        &core_genome_aligner, 
+                        num_threads
+                    )},
+                fastq::PotentiallyGzipFastqReader::GzipReader { reader: fwd_reader } => {
+                    pseudoaligner::process_reads::<K, CoreGenomePseudoaligner<K>, _>(
+                        fwd_reader,
+                        None,
+                        &core_genome_aligner, 
+                        num_threads
+                    )},
+            }
+        },
+        Some(rev) => {
+            match rev {
+                fastq::PotentiallyGzipFastqReader::PlainReader { reader: rev_reader } => {
+                    match reads {
+                        fastq::PotentiallyGzipFastqReader::PlainReader { reader: fwd_reader } => {
+                            pseudoaligner::process_reads::<K, CoreGenomePseudoaligner<K>, _>(
+                                fwd_reader,
+                                Some(rev_reader),
+                                &core_genome_aligner, 
+                                num_threads
+                            )},
+                        fastq::PotentiallyGzipFastqReader::GzipReader { .. } =>
+                            panic!("Found a reverse read file that was gzipped, while the forward \
+                                reads were not. This case is not handled.")
+                    }
+                },
+                fastq::PotentiallyGzipFastqReader::GzipReader { reader: rev_reader } => {
+                    match reads {
+                        fastq::PotentiallyGzipFastqReader::PlainReader { .. } => 
+                            panic!("Found a forward read file that was gzipped, while the reverse \
+                                reads were not. This case is not handled."),
+                        fastq::PotentiallyGzipFastqReader::GzipReader { reader: fwd_reader } => {
+                            pseudoaligner::process_reads::<K, CoreGenomePseudoaligner<K>, _>(
+                                fwd_reader,
+                                Some(rev_reader),
+                                &core_genome_aligner, 
+                                num_threads
+                            )},
+                    }
+                },
+            }
+        }
+    }.expect("Mapping failed");
     info!("Finished mapping reads!");
 
     if log_enabled!(Level::Debug) {
