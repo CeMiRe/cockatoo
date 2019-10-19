@@ -360,12 +360,12 @@ fn set_log_level(matches: &clap::ArgMatches, is_last: bool) {
         }
     }
     if is_last {
-        info!("CoverM version {}", crate_version!());
+        info!("Cockatoo version {}", crate_version!());
     }
 }
 
 fn build_cli() -> App<'static, 'static> {
-    return App::new("coverm")
+    return App::new("cockatoo")
         .version(crate_version!())
         .author("Ben J. Woodcroft <benjwoodcroft near gmail.com>")
         .about("Mapping coverage analysis for metagenomics")
