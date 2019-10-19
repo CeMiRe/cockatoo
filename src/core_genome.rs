@@ -409,8 +409,6 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
     genomes_and_contigs: GenomesAndContigs,
 ) -> CoreGenomePseudoaligner<K> {
     let node_id_to_clade_cores: Mutex<BTreeMap<usize, Vec<u32>>> = Mutex::new(BTreeMap::new());
-    let genome_clade_ids: Mutex<Vec<usize>> = Mutex::new(vec![]);
-    let core_genome_sizes: Mutex<Vec<usize>> = Mutex::new(vec![]);
 
     // Function to extract the next tranch of core genome regions for the next
     // contig
@@ -428,11 +426,12 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
             (starting_index, i)
         };
 
-    core_genome_regions.into_par_iter().enumerate().for_each ( |(clade_id_usize, clade_core_genomes)| {
+    // Thread all genomes. Map to a vector of vectors V2 where V2 is a list of (clade_id, core_genome_size)
+    let mut clade_ids_and_core_genomes: Vec<Vec<(usize,usize)>> = vec![];
+    core_genome_regions.into_par_iter().enumerate().map( |(clade_id_usize, clade_core_genomes)| {
         let clade_id = clade_id_usize as u32;
-        for (genome_id, genome_regions) in clade_core_genomes.iter().enumerate() {
+        clade_core_genomes.iter().enumerate().map( |(genome_id, genome_regions)| {
             assert_eq!(clade_id_usize, genome_regions[0].clade_id as usize);
-            genome_clade_ids.lock().expect("lock poisoned by different thread").push(clade_id_usize);
             let mut core_genome_size = 0usize;
 
             let (mut region_index_start, mut region_index_stop) =
@@ -492,9 +491,21 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
                     break;
                 }
             }
-            core_genome_sizes.lock().expect("poisoned lock").push(core_genome_size);
+            (clade_id_usize, core_genome_size)
+        })
+        .collect()
+    })
+    .collect_into_vec(&mut clade_ids_and_core_genomes);
+
+    // Collect clade_ids and core_genome_sizes into flat vectors
+    let mut genome_clade_ids: Vec<usize> = vec![];
+    let mut core_genome_sizes: Vec<usize> = vec![];
+    for clade_stats in clade_ids_and_core_genomes.iter() {
+        for (clade_id, core_genome_size) in clade_stats {
+            genome_clade_ids.push(*clade_id);
+            core_genome_sizes.push(*core_genome_size);
         }
-    });
+    }
 
     // For reproducibility (and ease of testing) sort each of the clade_core lists
     let mut inner_node_id_to_clade_cores = node_id_to_clade_cores.into_inner().unwrap();
@@ -505,8 +516,8 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
     return CoreGenomePseudoaligner {
         index: aligner.index,
         contig_names: aligner.tx_names,
-        core_genome_sizes: core_genome_sizes.into_inner().unwrap(),
-        genome_clade_ids: genome_clade_ids.into_inner().unwrap(),
+        core_genome_sizes: core_genome_sizes,
+        genome_clade_ids: genome_clade_ids,
         node_id_to_clade_cores: inner_node_id_to_clade_cores,
         genomes_and_contigs: genomes_and_contigs,
     };
