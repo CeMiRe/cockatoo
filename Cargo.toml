@@ -28,7 +28,10 @@ crossbeam = "0.4"
 serde = "1.0"
 flate2 = "1.0"
 # Possibly works with newer commits, but this was the newest at time of writing.
-debruijn = { git = "https://github.com/10XGenomics/rust-debruijn", rev = "9c7caf1903b15758c8e9c7fa546b6f3fcf438fdc" }
+#debruijn = { git = "https://github.com/10XGenomics/rust-debruijn", rev = "9c7caf1903b15758c8e9c7fa546b6f3fcf438fdc" }
+# Use git commits for rust-debruijn and rust-boomphf so logging can be debug in release mode
+debruijn = { git = "https://github.com/wwood/rust-debruijn", rev = "7fd0ac5cab60c5dd8dbfa9b292d8cc6f0ce1a2c3" }
+boomphf = { git = "https://github.com/wwood/rust-boomphf", rev = "4569ed4857356b88171ffee3c24424bfb48fdbc8" } 
 snap = "0.2"
 csv = "1.1"
 rstar = "0.5"
@@ -37,9 +40,6 @@ seq_io = { git = "https://github.com/wwood/seq_io", rev = "62a21f22b915ee70495ba
 
 [dev-dependencies]
 assert_cli = "0.6.*"
-
-[dependencies.boomphf]
-version = "0.5"
 
 [dependencies.bincode]
 version = "1.1"
