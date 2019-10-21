@@ -190,6 +190,26 @@ pub fn calculate_genome_kmer_coverage<K: Kmer + Sync + Send>(
     let mut genome_to_read_count;
     let mut num_covergence_steps: u32 = 0;
 
+    // Print the coverage that is uniquely assigned to each genome
+    if log_enabled!(Level::Debug) {
+        let mut genome_to_unique_coverage = vec![0.0; genomes_and_contigs.genomes.len()];
+        for (i, coverage) in eq_class_coverages.iter().enumerate() {
+            match eq_classes[i] {
+                None => unreachable!(),
+                Some(ref eqs) => {
+                    if eqs.len() == 1 {
+                        for eq in eqs.iter() {
+                            genome_to_unique_coverage[contig_idx_to_genome_idx[*eq as usize]] += *coverage as f64;
+                        }
+                    }
+                }
+            }
+        }
+        for (i, unique_cov) in genome_to_unique_coverage.iter().enumerate() {
+            debug!("Genome {} had unique coverage {}", genomes_and_contigs.genomes[i], unique_cov);
+        }
+    }
+
     loop { // loop until converged
         // E-step: Determine the number of reads we expect come from each contig
         // given their relative abundance.
