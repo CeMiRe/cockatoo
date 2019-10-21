@@ -19,7 +19,8 @@ use pseudoalignment_reference_readers::DebruijnIndex;
 use genomes_and_contigs::GenomesAndContigs;
 
 
-// A region marked as being core for a clade
+/// A region marked as being core for a clade. kmers must fit entirely between
+/// start and stop positions, which are both 0-based indices.
 #[derive(Clone, PartialEq, PartialOrd, Debug)]
 pub struct CoreGenomicRegion {
     pub clade_id: u32,
@@ -55,7 +56,7 @@ pub struct CoreGenomePseudoaligner<K: Kmer + Send + Sync> {
 }
 
 pub fn save_index<K>(
-    index: CoreGenomePseudoaligner<K>,
+    index: &CoreGenomePseudoaligner<K>,
     output_file: &str)
 where K: Kmer + Serialize + Send + Sync {
 
@@ -102,14 +103,14 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
         // Scan the read for the first kmer that exists in the reference
         let find_kmer_match = |kmer_pos: &mut usize| -> Option<(usize, usize)> {
             while *kmer_pos <= last_kmer_pos {
-                debug!("Determining kmer at position {}", *kmer_pos);
+                trace!("Determining kmer at position {}", *kmer_pos);
                 let read_kmer = read_seq.get_kmer(*kmer_pos);
 
                 match self.index.dbg_index.get(&read_kmer) {
                     None => (),
                     Some((nid, offset)) => {
                         let node = self.index.dbg.get_node(*nid as usize);
-                        debug!("kmer hit to node {:?}", node);
+                        trace!("kmer hit to node {:?}", node);
                         // Check that this is a real hit and the kmer is
                         // actually in the MPHF.
                         let ref_seq_slice = node.sequence();
@@ -234,7 +235,7 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
                 colors.push(*color);
 
                 // add node_ids to list of found nodes
-                debug!(
+                trace!(
                     "Adding node_id to list of visited nodes: {:?}",
                     node_id.unwrap()
                 );
@@ -353,7 +354,7 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
             //
             // First get a set of clade_ids that are tagged in each node.
             let mut clade_cores = None;
-            debug!("Found visited nodes: {:?}", visited_nodes);
+            trace!("Found visited nodes: {:?}", visited_nodes);
             for node_id in visited_nodes {
                 match self.node_id_to_clade_cores.get(&node_id) {
                     None => {
@@ -724,14 +725,18 @@ fn thread_and_find_core_nodes<K: Kmer + Send + Sync>(
 
     for _ in 1..last_kmer_pos {
         // debug!("");
-        // debug!(
-        //     "===== Finding kmer at contig position {}",
-        //     current_position.contig_position
-        // );
+        trace!(
+            "===== Finding kmer at contig position {}",
+            current_position.contig_position
+        );
         // if position is in core genome, mark it.
         let mut current_core_region = &core_regions[current_core_region_idx];
         if current_core_region.start <= current_position.contig_position {
-            if current_core_region.stop <= current_position.contig_position {
+            trace!("current core start/stop {}/{}, position {}", 
+                current_core_region.start,
+                current_core_region.stop,
+                current_position.contig_position);
+            if current_core_region.stop < current_position.contig_position+(kmer_length as u32) {
                 // Finished the current core genome region. Move to the next
                 // one.
                 current_core_region_idx += 1;
@@ -748,7 +753,7 @@ fn thread_and_find_core_nodes<K: Kmer + Send + Sync>(
                 None => {}
                 Some(pos) => {
                     if current_core_region.start <= current_position.contig_position {
-                        // debug!("Marking as core the current node {}", pos.node_id);
+                        debug!("Marking as core the current node {}", pos.node_id);
                         match last_node_id {
                             Some(nid) => {
                                 if pos.node_id != nid {
@@ -902,7 +907,7 @@ mod tests {
             clade_id: 0,
             contig_id: 0,
             start: 10,
-            stop: 100,
+            stop: 100+24,
         }]]];
 
         // Build index
@@ -949,13 +954,13 @@ mod tests {
                 clade_id: 0,
                 contig_id: 0,
                 start: 0,
-                stop: 1,
+                stop: 1+23,
             },
             CoreGenomicRegion {
                 clade_id: 0,
                 contig_id: 0,
                 start: 80,
-                stop: 82,
+                stop: 82+23,
             },
         ]]];
 
@@ -1002,7 +1007,7 @@ mod tests {
     }
 
     #[test]
-    fn test_core_genome_2_genomes() {
+    fn test_core_genome_2_genomes_first() {
         init();
         let cores = vec![
             vec![vec![
@@ -1010,20 +1015,20 @@ mod tests {
                     clade_id: 0,
                     contig_id: 0,
                     start: 0,
-                    stop: 10,
+                    stop: 10+24,
                 },
                 CoreGenomicRegion {
                     clade_id: 0,
                     contig_id: 0,
                     start: 80,
-                    stop: 82,
+                    stop: 82+24,
                 },
             ]],
             vec![vec![CoreGenomicRegion {
                 clade_id: 1,
                 contig_id: 0,
                 start: 10,
-                stop: 15,
+                stop: 15+24,
             }]],
         ];
 
@@ -1178,20 +1183,20 @@ mod tests {
                     clade_id: 0,
                     contig_id: 0,
                     start: 0,
-                    stop: 10,
+                    stop: 10+23,
                 },
                 CoreGenomicRegion {
                     clade_id: 0,
                     contig_id: 0,
                     start: 80,
-                    stop: 82,
+                    stop: 82+23,
                 },
             ]],
             vec![vec![CoreGenomicRegion {
                 clade_id: 1,
                 contig_id: 0,
                 start: 10,
-                stop: 15,
+                stop: 15+23,
             }]],
         ];
 
@@ -1356,5 +1361,61 @@ mod tests {
             b"ATCGCCCGTCACCACCCCAATTCATA");
         let res = core_aligner.map_read(&dna);
         assert_eq!(Some((vec![], 26usize)), res);
+    }
+
+    #[test]
+    fn test_diverging_core_bug() {
+        init();
+        let cores = vec![
+            vec![
+                vec![
+                    CoreGenomicRegion {
+                        clade_id: 0,
+                        contig_id: 0,
+                        start: 0,
+                        stop: 99,
+                    },
+                ],
+                vec![
+                    CoreGenomicRegion {
+                        clade_id: 0,
+                        contig_id: 0,
+                        start: 0,
+                        stop: 99,
+                    }]],
+        ];
+
+        let geco = read_genome_definition_file(
+            "tests/data/diverging_core_indexing_bug/definition");
+
+        // Build index
+        let reference_reader = fasta::Reader::from_file(
+            "tests/data/diverging_core_indexing_bug/together.fna",
+        )
+        .expect("reference reading failed.");
+
+        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+            "tests/data/diverging_core_indexing_bug/together.fna",
+            1);
+
+        info!("Reading reference sequences in ..");
+        let (mut seqs, _,_) = utils::read_transcripts(
+            reference_reader,
+            |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
+            .expect("Failure to read contigs file");
+
+        let s1 = seqs.pop().unwrap();
+        let s0 = seqs.pop().unwrap();
+        debug!("s1 len {}",&s1.len()); // 100.fna is right
+
+        let core_aligner = generate_core_genome_pseudoaligner(
+            &cores,
+            &vec![vec![vec![s0],vec![s1]]],
+            index,
+            geco,
+        );
+        //super::save_index(&core_aligner, "/tmp/inda");
+        assert_eq!(vec![77,77], core_aligner.core_genome_sizes);
+        info!("aligner: {:?}", core_aligner);
     }
 }

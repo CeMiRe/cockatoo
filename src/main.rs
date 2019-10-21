@@ -115,7 +115,7 @@ fn main(){
 
             info!("Saving index ..");
             cockatoo::core_genome::save_index(
-                core_genome_pseudoaligner, &output);
+                &core_genome_pseudoaligner, &output);
             info!("Saving complete");
         },
 

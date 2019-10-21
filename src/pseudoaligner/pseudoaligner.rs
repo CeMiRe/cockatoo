@@ -542,58 +542,51 @@ fn map_read_pair<T: PseudoalignmentReadMapper, Q: fastq::Record>(
 
     // TODO: Check for mismatching sequence names like BWA does
 
-    // Process
-    // TODO: Do not assume pairs are in forward-reverse orientation.
-    let forward_mapping_coverage =
-        add_coverage(&fwd_fwd_classes) + add_coverage(&rev_rev_classes);
-    let reverse_mapping_coverage =
-        add_coverage(&fwd_rev_classes) + add_coverage(&rev_fwd_classes);
-    debug!("Found mapping f/r mapping coverages for pair: {}/{}",
-           forward_mapping_coverage, reverse_mapping_coverage);
+    // Process TODO: The orientations that are reported for the fwd and rev may
+    // actually be random if they are mapped to different nodes or sets of
+    // nodes, and it isn't clear how to match them together without traversing
+    // the graph. Some options here: (1) Take the highest coverage for the fwd
+    // and rev separately, and merge those, or (2) Take the highest coverage out
+    // of all 4 possibilities and go with that, or (3) Somehow take into account
+    // the eq_classes (and maybe even genomes). For now at least that is all too
+    // hard, just going with (1).
+    debug!("Found forward coverage components {} {} and reverse components {} {}",
+        add_coverage(&fwd_fwd_classes), add_coverage(&rev_rev_classes),
+        add_coverage(&fwd_rev_classes), add_coverage(&rev_fwd_classes));
+    let fwd_coverages = if add_coverage(&fwd_fwd_classes) > add_coverage(&fwd_rev_classes) {
+        fwd_fwd_classes
+    } else {
+        fwd_rev_classes
+    };
+    let rev_coverages = if add_coverage(&rev_fwd_classes) > add_coverage(&rev_rev_classes) {
+        rev_fwd_classes
+    } else {
+        rev_rev_classes
+    };
 
     // TODO: Maybe calculating the read_name isn't needed
     let read_name = fwd_record.id().to_owned().expect("UTF-8 parsing error in read name").to_string();
 
-    return if forward_mapping_coverage > reverse_mapping_coverage {
-        if forward_mapping_coverage > READ_COVERAGE_THRESHOLD*2 {
-            // Mapped read pair in sense direction
-            (true,
-             read_name,
-             match (fwd_fwd_classes, rev_rev_classes) {
-                 (Some((mut f_eq_class, _)), Some((r_eq_class, _))) => {
-                     // Intersect operates in place
-                     intersect(&mut f_eq_class, &r_eq_class);
-                     f_eq_class
-                 },
-                 (Some((f_eq_class, _)), None) => f_eq_class,
-                 (None, Some((r_eq_class, _))) => r_eq_class,
-                 (None, None) => unreachable!()
-             },
-             forward_mapping_coverage)
-        } else {
-            // Don't waste time calculating unused info here
-            (false, read_name, vec![], 0)
-        }
+    let total_coverage = add_coverage(&fwd_coverages) + add_coverage(&rev_coverages);
+    return if total_coverage > READ_COVERAGE_THRESHOLD*2 {
+        (
+            true,
+            read_name,
+            match (fwd_coverages, rev_coverages) {
+                (Some((mut f_eq_class, _)), Some((r_eq_class, _))) => {
+                    // Intersect operates in place
+                    intersect(&mut f_eq_class, &r_eq_class);
+                    f_eq_class
+                },
+                (Some((f_eq_class, _)), None) => f_eq_class,
+                (None, Some((r_eq_class, _))) => r_eq_class,
+                (None, None) => unreachable!()
+            },
+            total_coverage,
+        )
     } else {
-        if reverse_mapping_coverage > READ_COVERAGE_THRESHOLD*2 {
-            // Mapped read pair in sense direction
-            (true,
-             read_name,
-             match (fwd_rev_classes, rev_fwd_classes) {
-                 (Some((mut f_eq_class, _)), Some((r_eq_class, _))) => {
-                     // Intersect operates in place
-                     intersect(&mut f_eq_class, &r_eq_class);
-                     f_eq_class
-                 },
-                 (Some((f_eq_class, _)), None) => f_eq_class,
-                 (None, Some((r_eq_class, _))) => r_eq_class,
-                 (None, None) => unreachable!()
-             },
-             reverse_mapping_coverage)
-        } else {
-            // Don't waste time calculating unused info here
-            (false, read_name, vec![], 0)
-        }
+        // Don't waste time calculating unused info here
+        (false, read_name, vec![], 0)
     };
 }
 
