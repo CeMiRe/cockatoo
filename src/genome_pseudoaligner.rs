@@ -191,7 +191,7 @@ pub fn calculate_genome_kmer_coverage<K: Kmer + Sync + Send>(
     let mut num_covergence_steps: u32 = 0;
 
     // Print the coverage that is uniquely assigned to each genome
-    if log_enabled!(Level::Debug) {
+    if log_enabled!(Level::Info) {
         let mut genome_to_unique_coverage = vec![0.0; genomes_and_contigs.genomes.len()];
         for (i, coverage) in eq_class_coverages.iter().enumerate() {
             match eq_classes[i] {
@@ -206,7 +206,7 @@ pub fn calculate_genome_kmer_coverage<K: Kmer + Sync + Send>(
             }
         }
         for (i, unique_cov) in genome_to_unique_coverage.iter().enumerate() {
-            debug!("Genome {} had unique coverage {}", genomes_and_contigs.genomes[i], unique_cov);
+            info!("Genome {} had unique coverage {}", genomes_and_contigs.genomes[i], unique_cov);
         }
     }
 
