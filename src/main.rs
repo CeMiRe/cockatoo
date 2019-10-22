@@ -144,17 +144,22 @@ fn main(){
                 info!("Writing Bandage-compatible core node annotations to {} ..",
                     gfa_csv_filename);
                 let mut csv_writer = std::fs::File::create(gfa_csv_filename).unwrap();
-                writeln!(csv_writer, "Node,Clades").unwrap();
+                writeln!(csv_writer, "Node,Annotation").unwrap();
                 for (node_id, clades) in &index.node_id_to_clade_cores {
-                    writeln!(csv_writer, "{},\"{:?}\"", node_id, clades).unwrap();
+                    writeln!(csv_writer, "{},\"clades {:?}, color {:?}\"", 
+                        node_id, 
+                        clades,
+                        index.index.dbg.get_node(*node_id).data()).unwrap();
                 }
             }
 
             // Write info table for each clade
-            println!("clade_id\tcore_genome_size");
-            for (clade_i, size) in index.core_genome_sizes.iter().enumerate() {
-                println!("{}\t{}", clade_i, size);
+            println!("genome_id\tcore_genome_size\tsequence_names");
+            for (genome_i, size) in index.core_genome_sizes.iter().enumerate() {
+                println!("{}\t{}\t", genome_i, size);
             }
+            debug!("Index eq_classes: {:?}", &index.index.eq_classes);
+            debug!("Index contig_names: {:?}", &index.contig_names);
         },
 
         Some("cluster") => {

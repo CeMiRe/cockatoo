@@ -106,17 +106,22 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
                 trace!("Determining kmer at position {}", *kmer_pos);
                 let read_kmer = read_seq.get_kmer(*kmer_pos);
 
+                // let node_offset_option = kmer_to_node_and_offset(
+                //     &self.index, &read_kmer);
+                // trace!("Found kmer {:?}", node_offset_option);
+
                 match self.index.dbg_index.get(&read_kmer) {
-                    None => (),
+                    None => {()},
                     Some((nid, offset)) => {
                         let node = self.index.dbg.get_node(*nid as usize);
-                        trace!("kmer hit to node {:?}", node);
+                        trace!("potential kmer hit to node {:?} at position {}, for kmer {}", node, offset, read_kmer.to_string());
                         // Check that this is a real hit and the kmer is
                         // actually in the MPHF.
                         let ref_seq_slice = node.sequence();
                         let ref_kmer: K = ref_seq_slice.get_kmer(*offset as usize);
 
                         if read_kmer == ref_kmer {
+                            trace!("kmer did actually hit node");
                             return Some((*nid as usize, *offset as usize));
                         }
                     }
@@ -129,21 +134,17 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
 
         // extract the first exact matching position of read
         let (mut node_id, mut kmer_offset) =
-        // get the first match through mphf
+            // get the first match through mphf
             match find_kmer_match(&mut kmer_pos) {
                 None => (None, None),
                 Some((nid, offset)) => (Some(nid), Some(offset))
             };
 
         // check if we can extend back if there were SNP in every kmer query
-        if kmer_pos >= left_extend_threshold && node_id.is_some() {
+        if kmer_pos >= left_extend_threshold && node_id.is_some() && kmer_offset.unwrap() > 0 {
             let mut last_pos = kmer_pos - 1;
             let mut prev_node_id = node_id.unwrap();
-            let mut prev_kmer_offset = if kmer_offset.unwrap() > 0 {
-                kmer_offset.unwrap() - 1
-            } else {
-                0
-            };
+            let mut prev_kmer_offset = kmer_offset.unwrap() - 1;
 
             loop {
                 let node = self.index.dbg.get_node(prev_node_id);
@@ -158,7 +159,7 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
                 // length of the skipped node sequence before kmer match
                 let skipped_ref = prev_kmer_offset + 1;
 
-                // find maximum extention possbile before fork or eof read
+                // find maximum extention possible before fork or eof read
                 let max_matchable_pos = std::cmp::min(skipped_read, skipped_ref);
 
                 let ref_seq_slice = node.sequence();
@@ -195,6 +196,8 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
                 // If reached here then a fork is found in the reference.
                 let exts = node.exts();
                 let next_base = read_seq.get(last_pos);
+                debug!("Looking for a {} base from position {} in the read", debruijn::bits_to_base(next_base), last_pos);
+                debug!("last pos {}, matched_bases {}", last_pos, matched_bases);
                 if exts.has_ext(Dir::Left, next_base) {
                     // found a left extention.
                     let index = exts
@@ -213,6 +216,7 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
                     // extract colors
                     let color = prev_node.data();
                     colors.push(*color);
+                    debug!("Adding color {} from node {}", color, prev_node_id);
                 } else {
                     break;
                 }
@@ -236,8 +240,9 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
 
                 // add node_ids to list of found nodes
                 trace!(
-                    "Adding node_id to list of visited nodes: {:?}",
-                    node_id.unwrap()
+                    "Adding node_id to list of visited nodes: {:?}, with color {}",
+                    node_id.unwrap(),
+                    color,
                 );
                 visited_nodes.push(node_id.unwrap());
 
@@ -323,6 +328,8 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
         } //end-if
 
         // Take the intersection of the sets
+        debug!("Before intersection, found colors: {:?} and so eq_classes {:?}", 
+            &colors, &colors.iter().map(|c| &self.index.eq_classes[*c as usize]).collect::<Vec<_>>());
         let colors_len = colors.len();
         if colors_len == 0 {
             if read_coverage != 0 {
@@ -354,7 +361,7 @@ impl<K: Kmer + Send + Sync> PseudoalignmentReadMapper for CoreGenomePseudoaligne
             //
             // First get a set of clade_ids that are tagged in each node.
             let mut clade_cores = None;
-            trace!("Found visited nodes: {:?}", visited_nodes);
+            debug!("Found visited nodes: {:?}", visited_nodes);
             for node_id in visited_nodes {
                 match self.node_id_to_clade_cores.get(&node_id) {
                     None => {
@@ -458,7 +465,8 @@ pub fn generate_core_genome_pseudoaligner<'a, K: Kmer + Send + Sync>(
                     contig_id,
                     &genome_regions[region_index_start..region_index_stop],
                 );
-                debug!("Found core node ids: {:?}", core_node_ids);
+                debug!("Found core node ids from clade {}, genome_id {}, contig {}, length {}: {:?}", 
+                    clade_id, genome_id, contig_id, contig_sequences[clade_id_usize][genome_id][contig_id].len(), core_node_ids);
                 {
                     let mut unlocked_core_node_ids = node_id_to_clade_cores
                         .lock().expect("lock poisoned by different thread");

@@ -551,8 +551,8 @@ fn map_read_pair<T: PseudoalignmentReadMapper, Q: fastq::Record>(
     // the eq_classes (and maybe even genomes). For now at least that is all too
     // hard, just going with (1).
     debug!("Found forward coverage components {} {} and reverse components {} {}",
-        add_coverage(&fwd_fwd_classes), add_coverage(&rev_rev_classes),
-        add_coverage(&fwd_rev_classes), add_coverage(&rev_fwd_classes));
+        add_coverage(&fwd_fwd_classes), add_coverage(&fwd_rev_classes),
+        add_coverage(&rev_fwd_classes), add_coverage(&rev_rev_classes));
     let fwd_coverages = if add_coverage(&fwd_fwd_classes) > add_coverage(&fwd_rev_classes) {
         fwd_fwd_classes
     } else {
