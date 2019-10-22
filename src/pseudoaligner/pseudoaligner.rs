@@ -359,7 +359,7 @@ pub fn process_reads<K: Kmer + Sync + Send, T: PseudoalignmentReadMapper + Sync 
             let tx = tx.clone();
             let readers = Arc::clone(&atomic_readers);
 
-            scope.spawn(move || {
+            scope.spawn(move |_| {
                 loop {
                     // TODO: Is is slow here to run a function for each read?
                     // Presumably? Fix by benchmarking inline(always)
@@ -458,7 +458,7 @@ pub fn process_reads<K: Kmer + Sync + Send, T: PseudoalignmentReadMapper + Sync 
         } // end-for
 
         info!("Found {} reads mapped out of {}", mapped_read_counter, read_counter);
-    }); //end crossbeam
+    }).expect("crossbeam result failure"); //end crossbeam
 
     debug!("Result: {:?}, {:?}, {:?}", eq_class_indices, eq_class_coverages, eq_class_read_counts);
 
