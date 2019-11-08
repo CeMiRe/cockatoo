@@ -176,10 +176,14 @@ fn main(){
             let v2: Vec<&str> = genome_fasta_files.iter().map(|s| &**s).collect();
             info!("Clustering {} genomes ..", genome_fasta_files.len());
 
-            let clusters = cockatoo::ani_clustering::minhash_clusterer::minhash_clusters(
-                &v2,
-                value_t!(m.value_of("ani"), f32).unwrap(),
-            );
+            let ani = value_t!(m.value_of("ani"), f32).unwrap();
+            let clusters = match m.value_of("method") {
+                Some("mash") => cockatoo::ani_clustering::minhash_clusterer::minhash_clusters(
+                    &v2, ani),
+                Some("fastani") => cockatoo::ani_clustering::fastani_clusterer::fastani_clusters(
+                    &v2, ani),
+                _ => unreachable!()
+            };
             info!("Found {} genome clusters", clusters.len());
 
             for cluster in clusters {
@@ -563,11 +567,16 @@ fn build_cli() -> App<'static, 'static> {
                      .default_value("fna")
                      .takes_value(true))
 
+                .arg(Arg::with_name("method")
+                    .long("method")
+                    .possible_values(&["fastani","mash"])
+                    .default_value("mash")
+                    .takes_value(true))
                 .arg(Arg::with_name("threads")
-                     .short("-t")
-                     .long("threads")
-                     .default_value("1")
-                     .takes_value(true)))
+                    .short("-t")
+                    .long("threads")
+                    .default_value("1")
+                    .takes_value(true)))
 
         .subcommand(
             SubCommand::with_name("screen")
