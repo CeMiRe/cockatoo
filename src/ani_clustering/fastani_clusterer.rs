@@ -9,12 +9,11 @@ use csv;
 
 /// Given a list of genomes, return them clustered.
 //
-// TODO: Implement aligned fraction etc. not just ANI.
 // TODO: Make this more scalable by mash/finch sketching first
-// TODO: num_threads? Except fastani can have problems with that
 pub fn fastani_clusters(
     genomes: &[&str],
     min_ani: f32,
+    num_threads: usize
 ) -> Vec<Vec<usize>> {
 
     // Write genomes to tempfile
@@ -35,6 +34,8 @@ pub fn fastani_clusters(
     // FastANI to stdout
     let mut cmd = std::process::Command::new("fastANI");
     cmd
+        .arg("-t")
+        .arg(format!("{}",&num_threads))
         .arg("-o")
         .arg("/dev/stdout")
         .arg("--queryList")

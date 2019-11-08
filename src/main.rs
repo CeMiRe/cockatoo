@@ -181,7 +181,7 @@ fn main(){
                 Some("mash") => cockatoo::ani_clustering::minhash_clusterer::minhash_clusters(
                     &v2, ani),
                 Some("fastani") => cockatoo::ani_clustering::fastani_clusterer::fastani_clusters(
-                    &v2, ani),
+                    &v2, ani, num_threads),
                 _ => unreachable!()
             };
             info!("Found {} genome clusters", clusters.len());
