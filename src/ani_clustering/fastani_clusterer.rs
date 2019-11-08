@@ -211,7 +211,8 @@ mod tests {
               "tests/data/parsnp/1_first_group/73.20120700_S3X.12.fna",
               "tests/data/parsnp/1_first_group/73.20110800_S2D.13.fna",
             ],
-            95.0
+            95.0,
+            2
         );
         assert_eq!(
             vec![vec![0,1,2,3]],
@@ -228,7 +229,8 @@ mod tests {
               "tests/data/parsnp/1_first_group/73.20120700_S3X.12.fna",
               "tests/data/parsnp/1_first_group/73.20110800_S2D.13.fna",
             ],
-            98.0
+            98.0,
+            3
         );
         assert_eq!(
             vec![vec![0,1,3],vec![2]],
