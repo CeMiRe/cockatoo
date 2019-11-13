@@ -178,7 +178,7 @@ fn main(){
 
             let ani = value_t!(m.value_of("ani"), f32).unwrap();
             let clusters = match m.value_of("method") {
-                Some("mash") => cockatoo::ani_clustering::minhash_clusterer::minhash_clusters(
+                Some("minhash") => cockatoo::ani_clustering::minhash_clusterer::minhash_clusters(
                     &v2, ani),
                 Some("fastani") => cockatoo::ani_clustering::fastani_clusterer::fastani_clusters(
                     &v2, ani, num_threads),
@@ -569,8 +569,8 @@ fn build_cli() -> App<'static, 'static> {
 
                 .arg(Arg::with_name("method")
                     .long("method")
-                    .possible_values(&["fastani","mash"])
-                    .default_value("mash")
+                    .possible_values(&["fastani","minhash"])
+                    .default_value("minhash")
                     .takes_value(true))
                 .arg(Arg::with_name("threads")
                     .short("-t")
