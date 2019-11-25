@@ -11,6 +11,7 @@ pub fn minhash_clusters(
     genomes: &[&str],
     min_ani: f32,
     n_hashes: usize,
+    kmer_length: u8,
 ) -> Vec<Vec<usize>> {
 
     // Generate sketches for all input files
@@ -25,7 +26,7 @@ pub fn minhash_clusters(
         genomes,
         n_hashes,
         n_hashes,
-        21,
+        kmer_length,
         &mut filter,
         true,
         0)
@@ -124,6 +125,7 @@ mod tests {
             ],
             95.0,
             1000,
+            21,
         );
         assert_eq!(
             vec![vec![0,1,2,3]],
@@ -142,6 +144,7 @@ mod tests {
             ],
             98.0,
             1000,
+            21,
         );
         assert_eq!(
             vec![vec![0,1,3],vec![2]],
