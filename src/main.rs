@@ -177,9 +177,10 @@ fn main(){
             info!("Clustering {} genomes ..", genome_fasta_files.len());
 
             let ani = value_t!(m.value_of("ani"), f32).unwrap();
+            let n_hashes = value_t!(m.value_of("num-hashes"), usize).unwrap();
             let clusters = match m.value_of("method") {
                 Some("minhash") => cockatoo::ani_clustering::minhash_clusterer::minhash_clusters(
-                    &v2, ani),
+                    &v2, ani, n_hashes),
                 Some("fastani") => cockatoo::ani_clustering::fastani_clusterer::fastani_clusters(
                     &v2, ani, num_threads),
                 _ => unreachable!()
@@ -541,6 +542,10 @@ fn build_cli() -> App<'static, 'static> {
                      .long("ani")
                      .takes_value(true)
                      .required(true))
+                .arg(Arg::with_name("num-hashes")
+                    .long("num-hashes")
+                    .takes_value(true)
+                    .default_value("1000"))
                 .arg(Arg::with_name("genome-fasta-files")
                      .short("f")
                      .long("genome-fasta-files")
