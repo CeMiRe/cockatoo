@@ -1,8 +1,9 @@
 use std::fs::File;
 use std::io::BufWriter;
 
-use pseudoaligner::*;
-use pseudoaligner::build_index::build_index;
+use debruijn_mapping::build_index::build_index;
+use crate::pseudoaligner::utils;
+use debruijn_mapping::pseudoaligner::Pseudoaligner;
 use genomes_and_contigs::GenomesAndContigs;
 use bio::io::fasta;
 use bincode;
@@ -13,7 +14,7 @@ use debruijn::Kmer;
 #[derive(Serialize, Deserialize)]
 pub struct DebruijnIndex<K>
 where K: debruijn::Kmer {
-    pub index: pseudoaligner::Pseudoaligner<K>,
+    pub index: Pseudoaligner<K>,
     pub seq_lengths: Vec<usize>,
     pub tx_names: Vec<String>,
 }

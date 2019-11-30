@@ -9,6 +9,7 @@ pub mod nucmer_core_genome_generator;
 pub mod ani_clustering;
 pub mod pseudoalignment_reference_readers;
 pub mod mapping_parameters;
+pub mod aligner;
 
 // Modules below shared as direct code copy between coverm and cockatoo
 pub mod genomes_and_contigs;
@@ -24,8 +25,7 @@ extern crate tempfile;
 extern crate rand;
 extern crate debruijn;
 extern crate boomphf;
-#[macro_use]
-extern crate lazy_static;
+extern crate debruijn_mapping;
 extern crate rayon;
 extern crate failure;
 extern crate crossbeam;

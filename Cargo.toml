@@ -20,7 +20,6 @@ env_logger = "0.7.*"
 tempdir = "0.3.*"
 tempfile = "3.1.*"
 ansi_term = "0.12"
-lazy_static = "1.3.0"
 rand = "0.7.*"
 rayon = "1.0"
 failure = "0.1"
@@ -28,10 +27,13 @@ crossbeam = "0.7.*"
 serde = "1.0"
 flate2 = "1.0"
 # Possibly works with newer commits, but this was the newest at time of writing.
-debruijn = { git = "https://github.com/10XGenomics/rust-debruijn", rev = "55db496526015cb1374ba6c769cc0651210af854" }
+# But now specifying a commit leads to compilation errors, I think.
+debruijn = { git = "https://github.com/10XGenomics/rust-debruijn" }#, rev = "55db496526015cb1374ba6c769cc0651210af854" }
 boomphf = { git = "https://github.com/10XGenomics/rust-boomphf", rev = "9bd02ab72f06414c48e04d15e845221f6a4a45cf" }
 # Use #13 branch so it compiles
-debruijn_mapping = { git = "https://github.com/10XGenomics/rust-pseudoaligner", rev = "27e24d3a6c4833de0021075faf7a1bbeb90d3139" }
+#debruijn_mapping = { git = "https://github.com/10XGenomics/rust-pseudoaligner", rev = "27e24d3a6c4833de0021075faf7a1bbeb90d3139" }
+# Needed so dbg_index isn't private
+debruijn_mapping = { path = "/home/ben/git/rust-pseudoaligner" }
 snap = "0.2"
 csv = "1.1"
 rstar = "0.7"

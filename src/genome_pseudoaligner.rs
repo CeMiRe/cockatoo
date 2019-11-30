@@ -4,8 +4,8 @@ use std::path::Path;
 use kmer_coverage::*;
 use genomes_and_contigs::GenomesAndContigs;
 use core_genome::{CoreGenomePseudoaligner,CoreGenomicRegion};
+use aligner;
 
-use pseudoaligner::*;
 use debruijn::Kmer;
 use debruijn::dna_string::DnaString;
 use bio::io::fasta;
@@ -100,14 +100,14 @@ pub fn calculate_genome_kmer_coverage<K: Kmer + Sync + Send>(
         None => {
             match reads {
                 fastq::PotentiallyGzipFastqReader::PlainReader { reader: fwd_reader } => {
-                    pseudoaligner::process_reads::<K, CoreGenomePseudoaligner<K>, _>(
+                    aligner::process_reads::<K, _>(
                         fwd_reader,
                         None,
                         &core_genome_aligner, 
                         num_threads
                     )},
                 fastq::PotentiallyGzipFastqReader::GzipReader { reader: fwd_reader } => {
-                    pseudoaligner::process_reads::<K, CoreGenomePseudoaligner<K>, _>(
+                    aligner::process_reads::<K, _>(
                         fwd_reader,
                         None,
                         &core_genome_aligner, 
@@ -120,7 +120,7 @@ pub fn calculate_genome_kmer_coverage<K: Kmer + Sync + Send>(
                 fastq::PotentiallyGzipFastqReader::PlainReader { reader: rev_reader } => {
                     match reads {
                         fastq::PotentiallyGzipFastqReader::PlainReader { reader: fwd_reader } => {
-                            pseudoaligner::process_reads::<K, CoreGenomePseudoaligner<K>, _>(
+                            aligner::process_reads::<K, _>(
                                 fwd_reader,
                                 Some(rev_reader),
                                 &core_genome_aligner, 
@@ -137,7 +137,7 @@ pub fn calculate_genome_kmer_coverage<K: Kmer + Sync + Send>(
                             panic!("Found a forward read file that was gzipped, while the reverse \
                                 reads were not. This case is not handled."),
                         fastq::PotentiallyGzipFastqReader::GzipReader { reader: fwd_reader } => {
-                            pseudoaligner::process_reads::<K, CoreGenomePseudoaligner<K>, _>(
+                            aligner::process_reads::<K, _>(
                                 fwd_reader,
                                 Some(rev_reader),
                                 &core_genome_aligner, 
