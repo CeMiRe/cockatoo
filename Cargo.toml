@@ -13,7 +13,7 @@ exclude = [ # Max upload is 10MB, as of writing test data was 15MB
 ]
 
 [dependencies]
-bio = "0.29.*"
+bio = "0.30.*"
 clap = "2.*"
 log = "0.4.*"
 env_logger = "0.7.*"
@@ -28,13 +28,13 @@ crossbeam = "0.7.*"
 serde = "1.0"
 flate2 = "1.0"
 # Possibly works with newer commits, but this was the newest at time of writing.
-#debruijn = { git = "https://github.com/10XGenomics/rust-debruijn", rev = "9c7caf1903b15758c8e9c7fa546b6f3fcf438fdc" }
-# Use git commits for rust-debruijn and rust-boomphf so logging can be debug in release mode
-debruijn = { git = "https://github.com/wwood/rust-debruijn", rev = "7fd0ac5cab60c5dd8dbfa9b292d8cc6f0ce1a2c3" }
-boomphf = { git = "https://github.com/wwood/rust-boomphf", rev = "4569ed4857356b88171ffee3c24424bfb48fdbc8" } 
+debruijn = { git = "https://github.com/10XGenomics/rust-debruijn", rev = "55db496526015cb1374ba6c769cc0651210af854" }
+boomphf = { git = "https://github.com/10XGenomics/rust-boomphf", rev = "9bd02ab72f06414c48e04d15e845221f6a4a45cf" }
+# Use #13 branch so it compiles
+debruijn_mapping = { git = "https://github.com/10XGenomics/rust-pseudoaligner", rev = "27e24d3a6c4833de0021075faf7a1bbeb90d3139" }
 snap = "0.2"
 csv = "1.1"
-rstar = "0.5"
+rstar = "0.7"
 finch = { git = "https://github.com/onecodex/finch-rs", rev = "5dc21d072c0bbd758532eff70871d101ed69e573" } # So mash_files can work in parallel. Presumably will be integrated in v0.3
 seq_io = { git = "https://github.com/wwood/seq_io", rev = "62a21f22b915ee70495ba242c994ea2f5b3a024c" } # so can read gzip fastq files
 
