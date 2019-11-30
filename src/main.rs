@@ -19,6 +19,9 @@ use env_logger::Builder;
 extern crate rayon;
 use rayon::prelude::*;
 
+extern crate debruijn_mapping;
+use debruijn_mapping::config;
+
 fn main(){
     let mut app = build_cli();
     let matches = app.clone().get_matches();
@@ -32,7 +35,7 @@ fn main(){
             let pseudoalign_params = parse_pseudoaligner_parameters(&m);
 
             info!("Restoring index ..");
-            let core_genome_pseudoaligner = cockatoo::core_genome::restore_index::<cockatoo::pseudoaligner::config::KmerType>(
+            let core_genome_pseudoaligner = cockatoo::core_genome::restore_index::<config::KmerType>(
                 m.value_of("index").unwrap());
 
             info!("Aligning reads and post-processing ..");
@@ -69,7 +72,7 @@ fn main(){
 
             info!("Generating index based on info from individual genome files ..");
             let index = cockatoo::pseudoalignment_reference_readers::generate_debruijn_index_grouping_via_genomes_and_contigs::
-            <cockatoo::pseudoaligner::config::KmerType>(
+            <config::KmerType>(
                 &genomes_and_contigs,
                 reference,
                 num_threads
@@ -125,7 +128,7 @@ fn main(){
 
             let index_path = m.value_of("index").unwrap();
             info!("Reading index {} ..", index_path);
-            let index = cockatoo::core_genome::restore_index::<cockatoo::pseudoaligner::config::KmerType>(index_path);
+            let index = cockatoo::core_genome::restore_index::<config::KmerType>(index_path);
             info!("Finished reading index");
 
             // Write GFA

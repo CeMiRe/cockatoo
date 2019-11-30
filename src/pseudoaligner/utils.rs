@@ -16,7 +16,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use bio::io::{fasta, fastq};
 use debruijn::dna_string::DnaString;
 
-use pseudoaligner::config;
+// use debruijn_mapping::config;
 
 const _MAPPABILITY_HEADER_STRING: &'static str = "tx_name\tgene_name\ttx_kmer_count\ttx_fraction_unique\tgene_fraction_unique\n";
 
@@ -99,43 +99,13 @@ where F: Fn(&str) -> (String,String) {
     Ok((seqs, tx_ids, tx_to_gene_map))
 }
 
-pub fn detect_fasta_format(record: &fasta::Record) -> Option<u8> {
-    let id_tokens: Vec<&str> = record.id().split('|').collect();
-    if id_tokens.len() == 9 {
-        return Some(config::FASTA_FORMAT_GENCODE)
-    }
-    match record.desc() {
-        Some(desc) => {
-            let desc_tokens: Vec<&str> = desc.split(' ').collect();
-            if desc_tokens.len() == 5 {
-                Some(config::FASTA_FORMAT_ENSEMBL)
-            } else {
-                None
-            }
-        },
-        None => None
-    }
+pub fn detect_fasta_format(_record: &fasta::Record) -> Option<u8> {
+    None // No format is used in cockatoo
 }
 
-pub fn extract_tx_gene_id(record: &fasta::Record, fasta_format: Option<u8>) -> Result<(String, String), Error>{
-    match fasta_format {
-        Some(config::FASTA_FORMAT_GENCODE) => {
-            let id_tokens: Vec<&str> = record.id().split('|').collect();
-            let tx_id = id_tokens[0].to_string();
-            let gene_id = id_tokens[1].to_string();
-            Ok((tx_id, gene_id))
-        },
-        Some(config::FASTA_FORMAT_ENSEMBL) => {
-            let tx_id = record.id().to_string();
-            let desc_tokens: Vec<&str> = record.desc().unwrap().split(' ').collect();
-            let gene_tmp: Vec<&str> = desc_tokens[2].split(':').collect();
-            let gene_id = gene_tmp[1].to_string();
-            Ok((tx_id, gene_id))
-        },
-        _ => {
-            Ok((record.id().to_string(), record.id().to_string()))
-        }
-    }
+pub fn extract_tx_gene_id(record: &fasta::Record, _fasta_format: Option<u8>) -> Result<(String, String), Error>{
+    // No format is used in cockatoo
+    Ok((record.id().to_string(), record.id().to_string()))
 }
 
 pub fn get_next_record<R: io::Read>(

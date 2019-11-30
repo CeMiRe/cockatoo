@@ -12,10 +12,9 @@ use debruijn_mapping::pseudoaligner::intersect;
 use failure::Error;
 
 use crate::core_genome::CoreGenomePseudoaligner;
-use crate::pseudoaligner;
 
 fn read_coverage_threshold() -> usize {
-    pseudoaligner::config::READ_COVERAGE_THRESHOLD
+    debruijn_mapping::config::READ_COVERAGE_THRESHOLD
 }
 
 // TODO: Generalise this to take gzipping fastq, fasta etc, and use a faster

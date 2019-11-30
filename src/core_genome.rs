@@ -703,13 +703,15 @@ mod tests {
             stop: 100+24,
         }]]];
 
+        debug!("Generating reference reader");
         // Build index
         let reference_reader = fasta::Reader::from_file(
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
         )
         .expect("reference reading failed.");
 
-        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+        debug!("Building test index");
+        let index = generate_debruijn_index_without_groupings::<debruijn_mapping::config::KmerType>(
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
             1);
 
@@ -763,7 +765,7 @@ mod tests {
         )
         .expect("reference reading failed.");
 
-        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+        let index = generate_debruijn_index_without_groupings::<debruijn_mapping::config::KmerType>(
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
             1);
 
@@ -833,7 +835,7 @@ mod tests {
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
         )
         .expect("reference reading failed.");
-        let index = generate_debruijn_index_grouping_via_genomes_and_contigs::<debruijn::kmer::Kmer24>(
+        let index = generate_debruijn_index_grouping_via_genomes_and_contigs::<debruijn_mapping::config::KmerType>(
             &geco,
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
             1);
@@ -901,7 +903,7 @@ mod tests {
         )
         .expect("reference reading failed.");
 
-        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+        let index = generate_debruijn_index_without_groupings::<debruijn_mapping::config::KmerType>(
             "tests/data/2_single_species_dummy_dataset/two_diverging_genomes.fna",
             1);
 
@@ -951,7 +953,7 @@ mod tests {
         // seq1 except G is at position 3, rc()
         let s1 = DnaString::from_dna_string(&"AGGCCGAGGATAGTGGCTGCTCGATGGGGA").rc();
 
-        let index2 = build_index::build_index::<debruijn::kmer::Kmer24>(
+        let index2 = debruijn_mapping::build_index::build_index::<debruijn_mapping::config::KmerType>(
             &vec![
                 s0.clone(), 
                 s1.clone(), 
@@ -963,8 +965,8 @@ mod tests {
         // The DBG above has 3 nodes, and some of the nodes to query are RC'd in
         // the kmer index
 
-        assert_eq!(Some((1,0)),kmer_to_node_and_offset(&index2, &s0.get_kmer::<debruijn::kmer::Kmer24>(0)));
-        assert_eq!(Some((1,0)),kmer_to_node_and_offset(&index2, &s0.get_kmer::<debruijn::kmer::Kmer24>(0).rc()));
+        assert_eq!(Some((1,0)),kmer_to_node_and_offset(&index2, &s0.get_kmer::<debruijn_mapping::config::KmerType>(0)));
+        assert_eq!(Some((1,0)),kmer_to_node_and_offset(&index2, &s0.get_kmer::<debruijn_mapping::config::KmerType>(0).rc()));
     }
 
     #[test]
@@ -1002,7 +1004,7 @@ mod tests {
         )
         .expect("reference reading failed.");
 
-        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+        let index = generate_debruijn_index_without_groupings::<debruijn_mapping::config::KmerType>(
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
             1);
 
@@ -1063,7 +1065,7 @@ mod tests {
         )
         .expect("reference reading failed.");
 
-        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+        let index = generate_debruijn_index_without_groupings::<debruijn_mapping::config::KmerType>(
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
             1);
 
@@ -1127,7 +1129,7 @@ mod tests {
         )
         .expect("reference reading failed.");
 
-        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+        let index = generate_debruijn_index_without_groupings::<debruijn_mapping::config::KmerType>(
             "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
             1);
 
@@ -1187,7 +1189,7 @@ mod tests {
         )
         .expect("reference reading failed.");
 
-        let index = generate_debruijn_index_without_groupings::<debruijn::kmer::Kmer24>(
+        let index = generate_debruijn_index_without_groupings::<debruijn_mapping::config::KmerType>(
             "tests/data/diverging_core_indexing_bug/together.fna",
             1);
 
