@@ -139,7 +139,7 @@ mod tests {
             .succeeds()
             .stdout().is(format!(
                 "Sample	Genome	Coverage\n\
-                 {}/tests/data/2_single_species_dummy_dataset/genome1_read_over100bp.1.fq	g1	0.3954802259887006\n\
+                 {}/tests/data/2_single_species_dummy_dataset/genome1_read_over100bp.1.fq	g1	0.7853107344632768\n\
                  {}/tests/data/2_single_species_dummy_dataset/genome1_read_over100bp.1.fq	g2	0\n",
                  index.path().to_str().unwrap(),
                  index.path().to_str().unwrap())
