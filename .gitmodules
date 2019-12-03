@@ -1,0 +1,3 @@
+[submodule "ext/rust-pseudoaligner"]
+	path = ext/rust-pseudoaligner
+	url = git@github.com:wwood/rust-pseudoaligner.git

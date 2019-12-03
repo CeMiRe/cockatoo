@@ -33,7 +33,7 @@ boomphf = { git = "https://github.com/10XGenomics/rust-boomphf", rev = "9bd02ab7
 # Use #13 branch so it compiles
 #debruijn_mapping = { git = "https://github.com/10XGenomics/rust-pseudoaligner", rev = "27e24d3a6c4833de0021075faf7a1bbeb90d3139" }
 # Needed so dbg_index isn't private
-debruijn_mapping = { path = "/home/ben/git/rust-pseudoaligner" }
+debruijn_mapping = { path = "ext/rust-pseudoaligner" }
 snap = "0.2"
 csv = "1.1"
 rstar = "0.7"
