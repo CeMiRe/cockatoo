@@ -68,6 +68,30 @@ mod tests {
         return tf;
     }
 
+
+    #[test]
+    fn test_bad_clade_file() {
+        let tf = tempfile::NamedTempFile::new().unwrap();
+        let clades_file = "tests/data/clade_file_reverse";
+        let reference_file = "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna";
+        let genome_definition_file = "tests/data/2_single_species_dummy_dataset/single_genome_example_tsv";
+        Assert::main_binary()
+            .with_args(&[
+                "index",
+                "--index",
+                tf.path().to_str().unwrap(),
+                "--clades",
+                clades_file,
+                "--reference",
+                reference_file,
+                "--genome-definition",
+                genome_definition_file])
+            .fails()
+            .stderr()
+            .contains("if that helps")
+            .unwrap();
+    }
+
     #[test]
     fn test_genome_kmer_one_genome() {
         let index = make_index(

@@ -59,6 +59,13 @@ fn main(){
                 .build_global()
                 .expect("Programming error: rayon initialised multiple times");
 
+
+            // For each clade, nucmer against the first genome.
+            info!("Reading clade definition ..");
+            let clade_definitions_file = m.value_of("clades").unwrap();
+            let clades = cockatoo::genome_pseudoaligner::read_clade_definition_file(
+                clade_definitions_file);
+
             let genomes_and_contigs = if m.is_present("genome-definition") {
                 let definition_file = m.value_of("genome-definition").unwrap();
                 info!("Reading contig names associated with each genome from {}..", definition_file);
@@ -77,12 +84,6 @@ fn main(){
                 reference,
                 num_threads
             );
-
-            // For each clade, nucmer against the first genome.
-            info!("Reading clade definition ..");
-            let clade_definitions_file = m.value_of("clades").unwrap();
-            let clades = cockatoo::genome_pseudoaligner::read_clade_definition_file(
-                clade_definitions_file);
 
             // TODO: ProgressBar?
             info!("Calculating core genomes ..");

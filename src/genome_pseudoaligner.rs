@@ -31,6 +31,8 @@ pub fn read_clade_definition_file(
     let mut current_rep: Option<String> = None;
     let mut current_members = vec![];
     let mut to_return = vec![];
+    let mut seen_members = BTreeSet::new();
+
     for result in rdr
         .expect(&format!("Failed to read clade definition file {}", file_path))
         .records() {
@@ -40,8 +42,13 @@ pub fn read_clade_definition_file(
                 std::process::exit(1);
             }
             let rep = &res[0];
-            let member = &res[1];
+            let member = &res[1].to_string();
 
+            if seen_members.contains(&member.clone()) {
+                error!("The genome {} has been assigned to at least two clades. The format of the clades file is \"representative<tab>member\" each line, if that helps.", member);
+                std::process::exit(1);
+            }
+            seen_members.insert(member.clone());
 
             match current_rep {
                 None => {
