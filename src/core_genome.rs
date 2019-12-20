@@ -180,7 +180,7 @@ impl<K: Kmer + Send + Sync> CoreGenomePseudoaligner<K> {
             None => None,
             Some(eq_class) => Some((eq_class,
             match read_coverage {
-                Some(cov) => cov,
+                Some(mapping_hit) => mapping_hit.read_coverage,
                 None => panic!("Unexpectedly had covered genomes, but no coverage number")
             }))
         }
