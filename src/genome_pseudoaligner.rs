@@ -425,7 +425,7 @@ pub fn core_genome_coverage_pipeline<K: Kmer + Send + Sync>(
     print_zero_coverage_contigs: bool,
     core_genome_pseudoaligner: &CoreGenomePseudoaligner<K>) {
 
-    debug!("Found node_to_core_genomes: {:#?}",
+    trace!("Found node_to_core_genomes: {:#?}",
            core_genome_pseudoaligner.node_id_to_clade_cores);
 
     // Map / EM / Print

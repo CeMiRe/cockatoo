@@ -126,7 +126,7 @@ pub fn process_reads<K: Kmer + Sync + Send, R: Read + Sync + Send>(
                         let classes = read_data.2;
                         let coverage = read_data.3;
 
-                        debug!("split cov {}, from {:?}", coverage, classes);
+                        trace!("split cov {}, from {:?}", coverage, classes);
                         let mut classes_sorted = classes.clone();
                         classes_sorted.sort();
 
@@ -206,14 +206,14 @@ fn calculate_fwd_rev<K: Kmer+Send+Sync>(
     -> (Option<(Vec<u32>, usize)>, Option<(Vec<u32>, usize)>) {
 
     let dna_string = DnaString::from_dna_string(seq);
-    debug!("Mapping forward DNA string: {:?}", dna_string);
+    trace!("Mapping forward DNA string: {:?}", dna_string);
     let fwd_classes = core_genome_pseudoaligner.map_read(&dna_string);
 
-    debug!("Mapping reverse DNA string: {:?}", dna_string.rc());
-    let rev_classes = core_genome_pseudoaligner.map_read(&dna_string.rc());
-    debug!("Found fwd eq_classes {:?} and reverse {:?}", fwd_classes, rev_classes);
+    // trace!("Mapping reverse DNA string: {:?}", dna_string.rc());
+    // let rev_classes = core_genome_pseudoaligner.map_read(&dna_string.rc());
+    // trace!("Found fwd eq_classes {:?} and reverse {:?}", fwd_classes, rev_classes);
 
-    (fwd_classes, rev_classes)
+    (fwd_classes, None)
 }
 
 fn add_coverage(c: &Option<(std::vec::Vec<u32>, usize)>)
@@ -248,7 +248,7 @@ fn map_read_pair<Q: fastq::Record, K: Kmer+Send+Sync>(
     // of all 4 possibilities and go with that, or (3) Somehow take into account
     // the eq_classes (and maybe even genomes). For now at least that is all too
     // hard, just going with (1).
-    debug!("Found forward coverage components {} {} and reverse components {} {}",
+    trace!("Found forward coverage components {} {} and reverse components {} {}",
         add_coverage(&fwd_fwd_classes), add_coverage(&fwd_rev_classes),
         add_coverage(&rev_fwd_classes), add_coverage(&rev_rev_classes));
     let fwd_coverages = if add_coverage(&fwd_fwd_classes) > add_coverage(&fwd_rev_classes) {

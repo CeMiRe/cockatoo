@@ -95,7 +95,7 @@ impl<K: Kmer + Send + Sync> CoreGenomePseudoaligner<K> {
         }
 
         // Take the intersection of the sets
-        debug!("Before intersection, found colors: {:?} and so eq_classes {:?}", 
+        trace!("Before intersection, found colors: {:?} and so eq_classes {:?}", 
             &colors, &colors.iter().map(|c| &self.index.eq_classes[*c as usize]).collect::<Vec<_>>());
         let colors_len = colors.len();
         if colors_len == 0 {
@@ -121,7 +121,7 @@ impl<K: Kmer + Send + Sync> CoreGenomePseudoaligner<K> {
             //
             // First get a set of clade_ids that are tagged in each node.
             let mut clade_cores = None;
-            debug!("Found visited nodes: {:?}", nodes);
+            trace!("Found visited nodes: {:?}", nodes);
             for node_id in nodes {
                 match self.node_id_to_clade_cores.get(&node_id) {
                     None => {
@@ -167,12 +167,6 @@ impl<K: Kmer + Send + Sync> CoreGenomePseudoaligner<K> {
     }
 
     pub fn map_read(&self, read_seq: &DnaString) -> Option<(Vec<u32>, usize)> {
-        // TODO: Change below to work out whether the node is in a core genome or not
-
-        // WARNING: The below code was copy/pasted from pseudoaligner.rs, but
-        // with some minor changes. It is unclear if in the future this will
-        // change drastically, so too lazy to abstract it out, for now.
-
         // Map read to nodes using debruijn_mapping
         //TODO: Prevent repeated allocation of nodes array
         let mut nodes = vec!();
@@ -180,6 +174,7 @@ impl<K: Kmer + Send + Sync> CoreGenomePseudoaligner<K> {
         
         // Convert node list to colors with reference to core genome
         let core_eq_classes = self.map_nodes_to_core_genomes(&mut nodes);
+        trace!("Found core_eq_classes for sequence {:?}: {:?}", read_seq, core_eq_classes);
 
         return match core_eq_classes {
             None => None,

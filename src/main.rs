@@ -157,6 +157,9 @@ fn main(){
                 }
             }
 
+            // Write eq_classes
+            debug!("eq_classes: {:?}", index.index.eq_classes);
+
             // Write info table for each clade
             println!("genome_id\tcore_genome_size\tsequence_names");
             for (genome_i, size) in index.core_genome_sizes.iter().enumerate() {
