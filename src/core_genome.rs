@@ -78,6 +78,16 @@ pub fn restore_index<'a, K: Kmer + DeserializeOwned + Send + Sync>(
                  generated with a different version of CoverM?");
 }
 
+#[derive(Debug)]
+pub struct PositionedMappingResult {
+    pub eq_class: Vec<u32>, 
+    pub read_coverage: usize,
+    /// Node id of the node where this read starts mapping
+    pub first_node_id: usize,
+    /// Position in the first node where this read starts mapping
+    pub first_base_offset: usize,
+}
+
 
 impl<K: Kmer + Send + Sync> CoreGenomePseudoaligner<K> {
     // Given a set of nodes, return a set of genomes consistent with that eq_class
@@ -166,11 +176,11 @@ impl<K: Kmer + Send + Sync> CoreGenomePseudoaligner<K> {
         }
     }
 
-    pub fn map_read(&self, read_seq: &DnaString) -> Option<(Vec<u32>, usize)> {
+    pub fn map_read(&self, read_seq: &DnaString) -> Option<PositionedMappingResult> {
         // Map read to nodes using debruijn_mapping
         //TODO: Prevent repeated allocation of nodes array
         let mut nodes = vec!();
-        let read_coverage = self.index.map_read_to_nodes(read_seq, &mut nodes);
+        let mapping_hit_opt = self.index.map_read_to_nodes(read_seq, &mut nodes);
         
         // Convert node list to colors with reference to core genome
         let core_eq_classes = self.map_nodes_to_core_genomes(&mut nodes);
@@ -178,11 +188,17 @@ impl<K: Kmer + Send + Sync> CoreGenomePseudoaligner<K> {
 
         return match core_eq_classes {
             None => None,
-            Some(eq_class) => Some((eq_class,
-            match read_coverage {
-                Some(mapping_hit) => mapping_hit.read_coverage,
-                None => panic!("Unexpectedly had covered genomes, but no coverage number")
-            }))
+            Some(eq_class) => Some(
+                match mapping_hit_opt {
+                    Some(mapping_hit) => PositionedMappingResult {
+                        eq_class: eq_class,
+                        read_coverage: mapping_hit.read_coverage,
+                        first_node_id: nodes[0],
+                        first_base_offset: mapping_hit.first_base_offset,
+                    },
+                    None => panic!("Unexpectedly had covered genomes, but no coverage number")
+                }
+            )
         }
     }
 }
@@ -1023,7 +1039,9 @@ mod tests {
         let dna = DnaString::from_acgt_bytes(b"ATCGCCCGTCACCACCCCAATTCATACACCACTAGCGGTTAGCAACGATT");
         let res = core_aligner.map_read(&dna);
         // TODO: Is that the right read_coverage being returned?
-        assert_eq!(Some((vec![0u32], 50usize)), res);
+        let r = res.unwrap();
+        assert_eq!(vec![0], r.eq_class);
+        assert_eq!(50, r.read_coverage);
     }
 
     #[test]
@@ -1086,7 +1104,9 @@ mod tests {
         // It's a non-core (rather than not in any genome).
         let dna = DnaString::from_acgt_bytes(b"ATCGCCCGTCACCACCCCAATTCA");
         let res = core_aligner.map_read(&dna);
-        assert_eq!(Some((vec![], 24usize)), res);
+        let r = res.unwrap();
+        assert_eq!(0, r.eq_class.len());
+        assert_eq!(24, r.read_coverage);
     }
     
     
@@ -1151,7 +1171,9 @@ mod tests {
         let dna = DnaString::from_acgt_bytes(
             b"ATCGCCCGTCACCACCCCAATTCATA");
         let res = core_aligner.map_read(&dna);
-        assert_eq!(Some((vec![], 26usize)), res);
+        let r = res.unwrap();
+        assert_eq!(0, r.eq_class.len());
+        assert_eq!(26, r.read_coverage);
     }
 
     #[test]

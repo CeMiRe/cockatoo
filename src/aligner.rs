@@ -11,7 +11,7 @@ use debruijn::Kmer;
 use debruijn_mapping::pseudoaligner::intersect;
 use failure::Error;
 
-use crate::core_genome::CoreGenomePseudoaligner;
+use crate::core_genome::{CoreGenomePseudoaligner,PositionedMappingResult};
 
 fn read_coverage_threshold() -> usize {
     debruijn_mapping::config::READ_COVERAGE_THRESHOLD
@@ -200,10 +200,10 @@ fn get_next_record_pair<R: io::Read>(
     }
 }
 
-fn add_coverage(c: &Option<(std::vec::Vec<u32>, usize)>)
+fn get_coverage(c: &Option<PositionedMappingResult>)
                 -> usize {
     match c {
-        Some((_, coverage)) => *coverage,
+        Some(hit) => hit.read_coverage,
         None => 0
     }
 }
@@ -218,11 +218,11 @@ fn map_read_pair<Q: fastq::Record, K: Kmer+Send+Sync>(
     // Read sequences and do the mapping
     let fwd_seq = str::from_utf8(fwd_record.seq()).unwrap();
     trace!("Mapping forward DNA string: {:?}", fwd_seq);
-    let fwd_coverages = core_genome_pseudoaligner.map_read(&DnaString::from_dna_string(fwd_seq));
+    let fwd_hit_opt = core_genome_pseudoaligner.map_read(&DnaString::from_dna_string(fwd_seq));
 
     let rev_seq = str::from_utf8(rev_record.seq()).unwrap();
     trace!("Mapping reverse DNA string: {:?}", rev_seq);
-    let rev_coverages = core_genome_pseudoaligner.map_read(&DnaString::from_dna_string(rev_seq));
+    let rev_hit_opt = core_genome_pseudoaligner.map_read(&DnaString::from_dna_string(rev_seq));
 
     // TODO: Check for mismatching sequence names like BWA does
 
@@ -235,24 +235,24 @@ fn map_read_pair<Q: fastq::Record, K: Kmer+Send+Sync>(
     // the eq_classes (and maybe even genomes). For now at least that is all too
     // hard, just going with (1).
     trace!("Found forward read coverage {} and reverse read coverage {}",
-        add_coverage(&fwd_coverages), add_coverage(&rev_coverages));
+        get_coverage(&fwd_hit_opt), get_coverage(&rev_hit_opt));
 
     // TODO: Maybe calculating the read_name isn't needed
     let read_name = fwd_record.id().to_owned().expect("UTF-8 parsing error in read name").to_string();
 
-    let total_coverage = add_coverage(&fwd_coverages) + add_coverage(&rev_coverages);
+    let total_coverage = get_coverage(&fwd_hit_opt) + get_coverage(&rev_hit_opt);
     return if total_coverage > read_coverage_threshold()*2 {
         (
             true,
             read_name,
-            match (fwd_coverages, rev_coverages) {
-                (Some((mut f_eq_class, _)), Some((r_eq_class, _))) => {
+            match (fwd_hit_opt, rev_hit_opt) {
+                (Some(mut fwd_hit), Some(rev_hit)) => {
                     // Intersect operates in place
-                    intersect(&mut f_eq_class, &r_eq_class);
-                    f_eq_class
+                    intersect(&mut fwd_hit.eq_class, &rev_hit.eq_class);
+                    fwd_hit.eq_class
                 },
-                (Some((f_eq_class, _)), None) => f_eq_class,
-                (None, Some((r_eq_class, _))) => r_eq_class,
+                (Some(fwd_hit), None) => fwd_hit.eq_class,
+                (None, Some(rev_hit)) => rev_hit.eq_class,
                 (None, None) => unreachable!()
             },
             total_coverage,
@@ -275,7 +275,7 @@ fn map_single_reads<Q: fastq::Record, K: Kmer+Send+Sync>(
 
     let seq = str::from_utf8(record.seq()).unwrap();
     match core_genome_pseudoaligner.map_read(&DnaString::from_dna_string(seq)) {
-        Some((eq_class, coverage)) => (true, read_name, eq_class, coverage),
+        Some(positioned_hit) => (true, read_name, positioned_hit.eq_class, positioned_hit.read_coverage),
         None => (false, read_name, Vec::new(), 0)
     }
 }
