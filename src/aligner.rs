@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use std::sync::{mpsc, Arc, Mutex};
 use std::collections::BTreeMap;
 use std::io::Read;
+use std::collections::HashSet;
 
 use seq_io::fastq;
 use crossbeam;
@@ -100,6 +101,9 @@ pub fn process_reads<K: Kmer + Sync + Send, R: Read + Sync + Send>(
         let mut mapped_read_counter: usize = 0;
         let mut dead_thread_count = 0;
 
+        let mut seen_read_positions = HashSet::new();
+        let mut high_coverage_region_read_count = 0usize;
+
         for eq_class in rx.iter() {
             match eq_class {
                 None => {
@@ -120,27 +124,35 @@ pub fn process_reads<K: Kmer + Sync + Send, R: Read + Sync + Send>(
                 Some(read_data) => {
                     //println!("{:?}, {}", read_data, read_data.0);
 
-                    if read_data.0 {
-                        mapped_read_counter += 1;
+                    match read_data {
+                        Some(hit) => {
+                            mapped_read_counter += 1;
 
-                        let classes = read_data.2;
-                        let coverage = read_data.3;
+                            if seen_read_positions.contains(&(hit.first_node_id, hit.first_base_offset)) {
+                                trace!("Read mapped to already seen node {} position {}", hit.first_node_id, hit.first_base_offset);
+                                high_coverage_region_read_count += 1;
+                            } else {
+                                seen_read_positions.insert((hit.first_node_id, hit.first_base_offset));
+                                let classes = hit.eq_class;
+                                let coverage = hit.read_coverage;
 
-                        trace!("split cov {}, from {:?}", coverage, classes);
-                        let mut classes_sorted = classes.clone();
-                        classes_sorted.sort();
+                                let mut classes_sorted = classes.clone();
+                                classes_sorted.sort();
 
-                        if eq_class_indices.contains_key(&classes_sorted) {
-                            let i = *eq_class_indices.get(&classes_sorted).unwrap();
-                            eq_class_coverages[i] += coverage;
-                            eq_class_read_counts[i] += 1;
-                        } else {
-                            let index = eq_class_indices.len();
-                            eq_class_indices.insert(classes_sorted, index);
-                            eq_class_coverages.push(coverage);
-                            eq_class_read_counts.push(1);
-                        }
-                    }
+                                if eq_class_indices.contains_key(&classes_sorted) {
+                                    let i = *eq_class_indices.get(&classes_sorted).unwrap();
+                                    eq_class_coverages[i] += coverage;
+                                    eq_class_read_counts[i] += 1;
+                                } else {
+                                    let index = eq_class_indices.len();
+                                    eq_class_indices.insert(classes_sorted, index);
+                                    eq_class_coverages.push(coverage);
+                                    eq_class_read_counts.push(1);
+                                }
+                            }
+                        },
+                        None => {}
+                    };
 
                     read_counter += 1;
                     if read_counter % 1_000_000 == 0 {
@@ -156,6 +168,7 @@ pub fn process_reads<K: Kmer + Sync + Send, R: Read + Sync + Send>(
         } // end-for
 
         info!("Found {} reads mapped out of {}", mapped_read_counter, read_counter);
+        info!("Excluded {} reads based on their mapping to already seen positions", high_coverage_region_read_count);
     }).expect("crossbeam result failure"); //end crossbeam
 
     debug!("Result: {:?}, {:?}, {:?}", eq_class_indices, eq_class_coverages, eq_class_read_counts);
@@ -213,7 +226,7 @@ fn map_read_pair<Q: fastq::Record, K: Kmer+Send+Sync>(
     fwd_record: &Q,
     rev_record: &Q,
     core_genome_pseudoaligner: &CoreGenomePseudoaligner<K>)
-    -> (bool, String, Vec<u32>, usize) {
+    -> Option<PositionedMappingResult> {
 
     // Read sequences and do the mapping
     let fwd_seq = str::from_utf8(fwd_record.seq()).unwrap();
@@ -242,24 +255,34 @@ fn map_read_pair<Q: fastq::Record, K: Kmer+Send+Sync>(
 
     let total_coverage = get_coverage(&fwd_hit_opt) + get_coverage(&rev_hit_opt);
     return if total_coverage > read_coverage_threshold()*2 {
-        (
-            true,
-            read_name,
-            match (fwd_hit_opt, rev_hit_opt) {
-                (Some(mut fwd_hit), Some(rev_hit)) => {
-                    // Intersect operates in place
-                    intersect(&mut fwd_hit.eq_class, &rev_hit.eq_class);
-                    fwd_hit.eq_class
-                },
-                (Some(fwd_hit), None) => fwd_hit.eq_class,
-                (None, Some(rev_hit)) => rev_hit.eq_class,
-                (None, None) => unreachable!()
+        Some(match (fwd_hit_opt, rev_hit_opt) {
+            (Some(mut fwd_hit), Some(rev_hit)) => {
+                // Intersect operates in place
+                intersect(&mut fwd_hit.eq_class, &rev_hit.eq_class);
+                PositionedMappingResult { 
+                    eq_class: fwd_hit.eq_class,
+                    read_coverage: total_coverage,
+                    first_node_id: fwd_hit.first_node_id,
+                    first_base_offset: fwd_hit.first_base_offset,
+                }
             },
-            total_coverage,
-        )
+            (Some(fwd_hit), None) => PositionedMappingResult {
+                eq_class: fwd_hit.eq_class,
+                read_coverage: fwd_hit.read_coverage,
+                first_node_id: fwd_hit.first_node_id,
+                first_base_offset: fwd_hit.first_base_offset,
+            },
+            (None, Some(rev_hit)) => PositionedMappingResult {
+                eq_class: rev_hit.eq_class,
+                read_coverage: rev_hit.read_coverage,
+                first_node_id: rev_hit.first_node_id,
+                first_base_offset: rev_hit.first_base_offset,
+            },
+            (None, None) => unreachable!()
+        })
     } else {
         // Don't waste time calculating unused info here
-        (false, read_name, vec![], 0)
+        None
     };
 }
 
@@ -269,13 +292,11 @@ fn map_read_pair<Q: fastq::Record, K: Kmer+Send+Sync>(
 fn map_single_reads<Q: fastq::Record, K: Kmer+Send+Sync>(
     record: &Q,
     core_genome_pseudoaligner: &CoreGenomePseudoaligner<K>)
-    -> (bool, String, Vec<u32>, usize)  {
+    -> Option<PositionedMappingResult> {
 
-    let read_name = record.id().to_owned().expect("UTF-8 parsing error in read name").to_string();
+    // let read_name = record.id().to_owned().expect("UTF-8 parsing error in read name").to_string();
 
     let seq = str::from_utf8(record.seq()).unwrap();
-    match core_genome_pseudoaligner.map_read(&DnaString::from_dna_string(seq)) {
-        Some(positioned_hit) => (true, read_name, positioned_hit.eq_class, positioned_hit.read_coverage),
-        None => (false, read_name, Vec::new(), 0)
-    }
+    // TODO need to threshold coverage here I think
+    core_genome_pseudoaligner.map_read(&DnaString::from_dna_string(seq))
 }
