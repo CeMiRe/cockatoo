@@ -2,6 +2,7 @@ extern crate cockatoo;
 
 use cockatoo::mapping_parameters::MappingParameters;
 use cockatoo::external_command_checker; // TODO: check for nucmer
+use cockatoo::checkm;
 use std::env;
 use std::str;
 use std::process;
@@ -58,12 +59,49 @@ fn main(){
                 .build_global()
                 .expect("Programming error: rayon initialised multiple times");
 
-
             // For each clade, nucmer against the first genome.
             info!("Reading clade definition ..");
             let clade_definitions_file = m.value_of("clades").unwrap();
-            let clades = cockatoo::genome_pseudoaligner::read_clade_definition_file(
-                clade_definitions_file);
+            let clades = match m.is_present("checkm-tab-table") {
+                false => cockatoo::genome_pseudoaligner::read_clade_definition_file(
+                    clade_definitions_file),
+                true => {
+                    // TODO: Check that all genomes are matched to either be
+                    // high quality or low quality, so there isn't inadvertant
+                    // filename mismatches.
+                    let initial_clades = cockatoo::genome_pseudoaligner::read_clade_definition_file(
+                        clade_definitions_file);
+                    let high_quality_genomes = checkm::CheckMTabTable::good_quality_genome_names(
+                        m.value_of("checkm-table").unwrap(),
+                        value_t!(m.value_of("min-completeness"), f32).expect("Failed to parse min-completeness to float"),
+                        value_t!(m.value_of("max-contamination"), f32).expect("Failed to parse max-contamination to float"),
+                    );
+                    let mut high_quality_genomes_set = std::collections::HashSet::new();
+                    high_quality_genomes_set.extend(high_quality_genomes.iter());
+                    // TODO: Is it OK that the representative might fail here, when underlings might not?
+                    let mut final_clades: Vec<Vec<String>> = vec![];
+                    for clade in initial_clades.into_iter() {
+                        let rep = clade[0].clone();
+                        let original_size = clade.len();
+                        let ok_genomes: Vec<String> = clade.into_iter().filter(|g|
+                            high_quality_genomes_set.contains(&std::path::Path::new(g).file_stem().unwrap().to_str().unwrap().to_string()))
+                            .collect();
+                        if ok_genomes.len() == 0 {
+                            warn!("The clade with representative {} had no high quality genomes", rep);
+                        } else {
+                            debug!("Clade {} had {} genomes left after removing low quality ones (originally there was {})", 
+                                rep, ok_genomes.len(), original_size);
+                            final_clades.push(ok_genomes)
+                        }
+                    }
+                    if final_clades.len() == 0 {
+                        error!("There was no genomes left after filtering low quality ones, cannot continue");
+                        std::process::exit(1);
+                    }
+                    final_clades
+                }
+            };
+            info!("Mapping to {} different clades", clades.len());
 
             let genomes_and_contigs = if m.is_present("genome-definition") {
                 let definition_file = m.value_of("genome-definition").unwrap();
@@ -497,18 +535,32 @@ fn build_cli() -> App<'static, 'static> {
                      .required_unless_one(
                          &["genome-fasta-directory","genome-fasta-files","genome-definition"])
                      .takes_value(true))
+                     .arg(
+                         Arg::with_name("genome-definition")
+                             .long("genome-definition")
+                             .conflicts_with("separator")
+                             .conflicts_with("genome-fasta-files")
+                             .conflicts_with("genome-fasta-directory")
+                             .required_unless_one(&[
+                                 "genome-fasta-files",
+                                 "separator",
+                                 "genome-fasta-directory",
+                             ])
+                            .takes_value(true))
                 .arg(
-                    Arg::with_name("genome-definition")
-                        .long("genome-definition")
-                        .conflicts_with("separator")
-                        .conflicts_with("genome-fasta-files")
-                        .conflicts_with("genome-fasta-directory")
-                        .required_unless_one(&[
-                            "genome-fasta-files",
-                            "separator",
-                            "genome-fasta-directory",
-                        ])
+                    Arg::with_name("checkm-tab-table")
+                        .long("checkm-tab-table")
                         .takes_value(true))
+                .arg(
+                    Arg::with_name("min-completeness")
+                        .long("min-completeness")
+                        .takes_value(true)
+                        .default_value("70"))
+                .arg(
+                    Arg::with_name("max-contamination")
+                        .long("max-contamination")
+                        .takes_value(true)
+                        .default_value("10"))
 
                 .arg(Arg::with_name("verbose")
                      .short("v")
