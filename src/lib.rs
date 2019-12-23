@@ -10,6 +10,7 @@ pub mod ani_clustering;
 pub mod pseudoalignment_reference_readers;
 pub mod mapping_parameters;
 pub mod aligner;
+pub mod checkm;
 
 // Modules below shared as direct code copy between coverm and cockatoo
 pub mod genomes_and_contigs;
