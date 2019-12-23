@@ -30,7 +30,7 @@ pub fn generate_debruijn_index_without_groupings<K: Kmer + Sync + Send>(
     // TODO: Remove duplication of gene and tax_id here - each contig is its own
     info!("Reading reference sequences in ..");
     let (seqs, tx_names, tx_gene_map) = utils::read_transcripts(
-        reference_reader,
+        vec![reference_reader],
         |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
         .expect("Failure to read contigs file");
 
@@ -53,7 +53,7 @@ pub fn generate_debruijn_index_grouping_via_separator<K: Kmer + Sync + Send>(
     // TODO: Remove duplication of gene and tax_id here - each contig is its own
     info!("Reading reference sequences in ..");
     let (seqs, tx_names, tx_gene_map) = utils::read_transcripts(
-        reference_reader,
+        vec![reference_reader],
         |contig_name| {
             debug!("target name {:?}, separator {:?}", contig_name, separator);
             let offset = contig_name.find(separator).expect(
@@ -71,15 +71,20 @@ pub fn generate_debruijn_index_grouping_via_separator<K: Kmer + Sync + Send>(
 
 pub fn generate_debruijn_index_grouping_via_genomes_and_contigs<K: Kmer + Sync + Send>(
     genomes_and_contigs: &GenomesAndContigs,
-    reference_path: &str,
+    reference_paths: &Vec<String>,
     num_threads: usize
 ) -> DebruijnIndex<K> {
 
-    let reference_reader = fasta::Reader::from_file(reference_path).expect("reference reading failed.");
+    let readers: Vec<_> = reference_paths.iter().map(|r| 
+        fasta::Reader::new(
+            std::fs::File::open(r).expect(
+                &format!("Failed to read genome {} for reading",r))))
+                .collect();
+
     // TODO: Remove duplication of gene and tax_id here - each contig is its own
     info!("Reading reference sequences in ..");
     let (seqs, tx_names, tx_gene_map) = utils::read_transcripts(
-        reference_reader,
+        readers,
         |contig_name|
             (contig_name.to_string(), 
             genomes_and_contigs.genome_of_contig(&contig_name.to_string())

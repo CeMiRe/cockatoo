@@ -728,7 +728,7 @@ mod tests {
 
         info!("Reading reference sequences in ..");
         let (seqs, _,_) = utils::read_transcripts(
-            reference_reader,
+            vec![reference_reader],
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
         let geco = read_genome_fasta_files(
@@ -782,7 +782,7 @@ mod tests {
 
         info!("Reading reference sequences in ..");
         let (seqs, _,_) = utils::read_transcripts(
-            reference_reader,
+            vec![reference_reader],
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
         let geco = read_genome_fasta_files(
@@ -848,12 +848,12 @@ mod tests {
         .expect("reference reading failed.");
         let index = generate_debruijn_index_grouping_via_genomes_and_contigs::<debruijn_mapping::config::KmerType>(
             &geco,
-            "tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna",
+            &vec!["tests/data/2_single_species_dummy_dataset/2genomes/genomes.fna".to_string()],
             1);
 
         info!("Reading reference sequences in ..");
         let (mut seqs, _,_) = utils::read_transcripts(
-            reference_reader,
+            vec![reference_reader],
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
 
@@ -920,7 +920,7 @@ mod tests {
 
         info!("Reading reference sequences in ..");
         let (mut seqs, _,_) = utils::read_transcripts(
-            reference_reader,
+            vec![reference_reader],
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
 
@@ -1021,7 +1021,7 @@ mod tests {
 
         info!("Reading reference sequences in ..");
         let (mut seqs, _,_) = utils::read_transcripts(
-            reference_reader,
+            vec![reference_reader],
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
 
@@ -1085,7 +1085,7 @@ mod tests {
 
         info!("Reading reference sequences in ..");
         let (mut seqs, _,_) = utils::read_transcripts(
-            reference_reader,
+            vec![reference_reader],
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
 
@@ -1151,7 +1151,7 @@ mod tests {
 
         info!("Reading reference sequences in ..");
         let (mut seqs, _,_) = utils::read_transcripts(
-            reference_reader,
+            vec![reference_reader],
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
 
@@ -1213,7 +1213,7 @@ mod tests {
 
         info!("Reading reference sequences in ..");
         let (mut seqs, _,_) = utils::read_transcripts(
-            reference_reader,
+            vec![reference_reader],
             |contig_name| { (contig_name.to_string(), contig_name.to_string()) })
             .expect("Failure to read contigs file");
 

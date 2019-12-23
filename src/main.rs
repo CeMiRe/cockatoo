@@ -50,7 +50,6 @@ fn main(){
             let m = matches.subcommand_matches("index").unwrap();
             set_log_level(m, true);
 
-            let reference = m.value_of("reference").unwrap();
             let output = m.value_of("index").unwrap();
             let num_threads = value_t!(m.value_of("threads"), usize).unwrap();
 
@@ -81,7 +80,7 @@ fn main(){
             let index = cockatoo::pseudoalignment_reference_readers::generate_debruijn_index_grouping_via_genomes_and_contigs::
             <config::KmerType>(
                 &genomes_and_contigs,
-                reference,
+                &(clades.iter().flatten().map(|s| s.clone()).collect()),
                 num_threads
             );
 
@@ -453,11 +452,6 @@ fn build_cli() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("index")
                 .about("Generate a mapping index for a collection of genomes")
-                .arg(Arg::with_name("reference")
-                     .short("-r")
-                     .long("reference")
-                     .takes_value(true)
-                     .required(true))
                 .arg(Arg::with_name("index")
                      .short("-d")
                      .long("index")

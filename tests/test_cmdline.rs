@@ -48,7 +48,6 @@ mod tests {
 
     fn make_index(
         clades_file: &str,
-        reference_file: &str,
         genome_definition_file: &str,
     ) -> tempfile::NamedTempFile {
         let tf = tempfile::NamedTempFile::new().unwrap();
@@ -59,8 +58,6 @@ mod tests {
                 tf.path().to_str().unwrap(),
                 "--clades",
                 clades_file,
-                "--reference",
-                reference_file,
                 "--genome-definition",
                 genome_definition_file])
             .succeeds()
@@ -73,7 +70,6 @@ mod tests {
     fn test_bad_clade_file() {
         let tf = tempfile::NamedTempFile::new().unwrap();
         let clades_file = "tests/data/clade_file_reverse";
-        let reference_file = "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna";
         let genome_definition_file = "tests/data/2_single_species_dummy_dataset/single_genome_example_tsv";
         Assert::main_binary()
             .with_args(&[
@@ -82,8 +78,6 @@ mod tests {
                 tf.path().to_str().unwrap(),
                 "--clades",
                 clades_file,
-                "--reference",
-                reference_file,
                 "--genome-definition",
                 genome_definition_file])
             .fails()
@@ -96,7 +90,6 @@ mod tests {
     fn test_genome_kmer_one_genome() {
         let index = make_index(
             "tests/data/2_single_species_dummy_dataset/2genomes_same_genome.clades",
-            "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna",
             "tests/data/2_single_species_dummy_dataset/single_genome_example_tsv"
         );
         
@@ -124,7 +117,6 @@ mod tests {
     fn test_genome_kmer_two_genomes_single_input() {
         let index = make_index(
             "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.different_clades",
-            "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna",
             "tests/data/2_single_species_dummy_dataset/two_genomes_tsv"
         );
         Assert::main_binary()
@@ -149,7 +141,6 @@ mod tests {
     fn test_genome_kmer_two_genomes_paired_input() {
         let index = make_index(
             "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.different_clades",
-            "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.fna",
             "tests/data/2_single_species_dummy_dataset/two_genomes_tsv"
         );
         Assert::main_binary()
@@ -225,7 +216,6 @@ mod tests {
     fn test_coverage_capping_hello_world() {
         let index = make_index(
             "tests/data/joel_test_data/2.clades",
-            "tests/data/joel_test_data/2.fna",
             "tests/data/joel_test_data/2.definition"
         );
         
