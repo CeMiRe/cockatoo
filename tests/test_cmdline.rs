@@ -221,6 +221,57 @@ mod tests {
             .unwrap()
     }
 
+    #[test]
+    fn test_coverage_capping_hello_world() {
+        let index = make_index(
+            "tests/data/joel_test_data/2.clades",
+            "tests/data/joel_test_data/2.fna",
+            "tests/data/joel_test_data/2.definition"
+        );
+        
+        // Mapping a single read should work.
+        Assert::main_binary()
+            .with_args(&[
+                "genome",
+                "--single",
+                "tests/data/mapping_bugs/bad4.fq",
+                "--index",
+                index.path().to_str().unwrap()
+                ])
+            .succeeds()
+            .stdout()
+            .is(
+                format!(
+                    "Sample	Genome	Coverage\n\
+                    {}/tests/data/mapping_bugs/bad4.fq	NC_023740.1	0.0021965791940018746\n\
+                    {}/tests/data/mapping_bugs/bad4.fq	NC_028907.1	0\n",
+                    index.path().to_str().unwrap(),
+                    index.path().to_str().unwrap())
+                    .as_str())
+            .unwrap();
+
+        // Mapping the same read pair twice should give the same result.
+        Assert::main_binary()
+            .with_args(&[
+                "genome",
+                "--single",
+                "tests/data/mapping_bugs/bad4_twice.fq",
+                "--index",
+                index.path().to_str().unwrap()
+                ])
+            .succeeds()
+            .stdout()
+            .is(
+                format!(
+                    "Sample	Genome	Coverage\n\
+                    {}/tests/data/mapping_bugs/bad4_twice.fq	NC_023740.1	0.0021965791940018746\n\
+                    {}/tests/data/mapping_bugs/bad4_twice.fq	NC_028907.1	0\n",
+                    index.path().to_str().unwrap(),
+                    index.path().to_str().unwrap())
+                    .as_str())
+            .unwrap()
+    }
+
 }
 
 
