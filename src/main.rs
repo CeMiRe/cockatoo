@@ -72,7 +72,7 @@ fn main(){
                     let initial_clades = cockatoo::genome_pseudoaligner::read_clade_definition_file(
                         clade_definitions_file);
                     let high_quality_genomes = checkm::CheckMTabTable::good_quality_genome_names(
-                        m.value_of("checkm-table").unwrap(),
+                        m.value_of("checkm-tab-table").unwrap(),
                         value_t!(m.value_of("min-completeness"), f32).expect("Failed to parse min-completeness to float"),
                         value_t!(m.value_of("max-contamination"), f32).expect("Failed to parse max-contamination to float"),
                     );
@@ -86,10 +86,11 @@ fn main(){
                         let ok_genomes: Vec<String> = clade.into_iter().filter(|g|
                             high_quality_genomes_set.contains(&std::path::Path::new(g).file_stem().unwrap().to_str().unwrap().to_string()))
                             .collect();
-                        if ok_genomes.len() == 0 {
-                            warn!("The clade with representative {} had no high quality genomes", rep);
+                        if ok_genomes[0] != rep {
+                            error!("The clade representative {} did not pass quality thresholds, which probably means failure later", rep);
+                            std::process::exit(1);
                         } else {
-                            debug!("Clade {} had {} genomes left after removing low quality ones (originally there was {})", 
+                            info!("Clade {} had {} genomes left after removing low quality ones (originally there was {})", 
                                 rep, ok_genomes.len(), original_size);
                             final_clades.push(ok_genomes)
                         }
@@ -101,7 +102,8 @@ fn main(){
                     final_clades
                 }
             };
-            info!("Mapping to {} different clades", clades.len());
+            info!("Mapping to {} genomes spread amongst {} different clades", 
+                clades.iter().fold(0, |acc,c| acc+c.len()), clades.len());
 
             let genomes_and_contigs = if m.is_present("genome-definition") {
                 let definition_file = m.value_of("genome-definition").unwrap();
