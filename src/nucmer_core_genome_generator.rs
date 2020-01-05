@@ -51,7 +51,18 @@ struct ContigAlignments<'a> {
     alignments: Vec<&'a nucmer_runner::NucmerDeltaAlignment>
 }
 
+/// Mark all regions of all genomes as core i.e. pretend all parts of all
+/// genomes are a part of the core, even if they aren't.
+pub fn all_genomes_as_core(
+    genome_fasta_paths: &[&str],
+    clade_id: u32
+) -> Vec<Vec<CoreGenomicRegion>> {
+    genome_fasta_paths.iter().map(|f| 
+        all_contigs_as_core_genome(clade_id, f)
+    ).collect()
+}
 
+/// Use nucmer to find core genomic regions amongst the set of genomes given.
 pub fn nucmer_core_genomes_from_genome_fasta_files(
     genome_fasta_paths: &[&str],
     clade_id: u32
@@ -539,8 +550,8 @@ fn all_contigs_as_core_genome(
         to_return.push(CoreGenomicRegion {
             clade_id: clade_id,
             contig_id: contig_id,
-            start: 1,
-            stop: record.seq().len() as u32
+            start: 0,
+            stop: (record.seq().len() - 1) as u32
         })
     }
     return to_return;
@@ -621,6 +632,25 @@ mod tests {
               "tests/data/parsnp/1_first_group/73.20120600_E3D.30.fna"],
             8
         );
+    }
+
+    #[test]
+    fn test_all_genomes_as_core() {
+        init();
+        let found = all_genomes_as_core(
+            &[
+            "tests/data/parsnp/1_first_group/73.20120800_S1D.21.fna",
+            "tests/data/parsnp/1_first_group/73.20120600_E3D.30.fna"
+            ], 9);
+
+        assert_eq!(137, found[0].len());
+        assert_eq!(252, found[1].len());
+        assert_eq!(CoreGenomicRegion {
+            clade_id: 9,
+            contig_id: 251,
+            start: 0,
+            stop: 6987
+        }, found[1][251]);
     }
 
     #[test]
