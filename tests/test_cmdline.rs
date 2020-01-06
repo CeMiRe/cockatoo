@@ -49,17 +49,21 @@ mod tests {
     fn make_index(
         clades_file: &str,
         genome_definition_file: &str,
+        extra_arguments: &Vec<&str>,
     ) -> tempfile::NamedTempFile {
         let tf = tempfile::NamedTempFile::new().unwrap();
-        Assert::main_binary()
-            .with_args(&[
-                "index",
+        let mut args = vec![
+            "index",
                 "--index",
                 tf.path().to_str().unwrap(),
                 "--clades",
                 clades_file,
                 "--genome-definition",
-                genome_definition_file])
+                genome_definition_file];
+        args.extend(extra_arguments.iter());
+
+        Assert::main_binary()
+            .with_args(&args)
             .succeeds()
             .unwrap();
         return tf;
@@ -90,7 +94,7 @@ mod tests {
     fn test_genome_kmer_one_genome() {
         let index = make_index(
             "tests/data/2_single_species_dummy_dataset/2genomes_same_genome.clades",
-            "tests/data/2_single_species_dummy_dataset/single_genome_example_tsv"
+            "tests/data/2_single_species_dummy_dataset/single_genome_example_tsv", &vec![]
         );
         
         Assert::main_binary()
@@ -117,7 +121,7 @@ mod tests {
     fn test_genome_kmer_two_genomes_single_input() {
         let index = make_index(
             "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.different_clades",
-            "tests/data/2_single_species_dummy_dataset/two_genomes_tsv"
+            "tests/data/2_single_species_dummy_dataset/two_genomes_tsv", &vec![]
         );
         Assert::main_binary()
             .with_args(&[
@@ -141,7 +145,7 @@ mod tests {
     fn test_genome_kmer_two_genomes_paired_input() {
         let index = make_index(
             "tests/data/2_single_species_dummy_dataset/2genomes_different_lengths.different_clades",
-            "tests/data/2_single_species_dummy_dataset/two_genomes_tsv"
+            "tests/data/2_single_species_dummy_dataset/two_genomes_tsv", &vec![]
         );
         Assert::main_binary()
             .with_args(&[
@@ -216,7 +220,7 @@ mod tests {
     fn test_coverage_capping_hello_world() {
         let index = make_index(
             "tests/data/joel_test_data/2.clades",
-            "tests/data/joel_test_data/2.definition"
+            "tests/data/joel_test_data/2.definition", &vec![]
         );
         
         // Mapping a single read should work.
@@ -262,6 +266,35 @@ mod tests {
             .unwrap()
     }
 
+    #[test]
+    fn test_no_core_genome() {
+        let index = make_index(
+            "tests/data/2_single_species_dummy_dataset/two_genomes_clades_same",
+            "tests/data/2_single_species_dummy_dataset/two_genomes_tsv",
+            &vec!["--no-core-genome"]
+        );
+        
+        // Mapping a single read should work.
+        Assert::main_binary()
+            .with_args(&[
+                "genome",
+                "--single",
+                "tests/data/2_single_species_dummy_dataset/reads/2genomes_3_reads_one_not_core.fq",
+                "--index",
+                index.path().to_str().unwrap()
+                ])
+            .succeeds()
+            .stdout()
+            .is(
+                format!(
+                    "Sample	Genome	Coverage\n\
+                    {}/tests/data/2_single_species_dummy_dataset/reads/2genomes_3_reads_one_not_core.fq	g1	0.003139807446870145\n\
+                    {}/tests/data/2_single_species_dummy_dataset/reads/2genomes_3_reads_one_not_core.fq	g2	0.46730777646896743\n",
+                    index.path().to_str().unwrap(),
+                    index.path().to_str().unwrap())
+                    .as_str())
+            .unwrap();
+    }
 }
 
 

@@ -124,16 +124,27 @@ fn main(){
                 num_threads
             );
 
-            // TODO: ProgressBar?
-            info!("Calculating core genomes ..");
+            if m.is_present("no-core-genome") {
+                // TODO: ProgressBar?
+                info!("Defining 'core genome' as all contigs of all genomes ..");
+            } else {
+                info!("Calculating core genomes with nucmer ..");
+            }
             let nucmer_core_genomes: Vec<Vec<Vec<cockatoo::core_genome::CoreGenomicRegion>>> = clades
                 .par_iter()
                 .enumerate()
                 .map(
-                    |(i, clade_fastas)|
-                    cockatoo::nucmer_core_genome_generator::nucmer_core_genomes_from_genome_fasta_files(
-                        &clade_fastas.iter().map(|s| &**s).collect::<Vec<&str>>()[..],
-                        i as u32)
+                    |(i, clade_fastas)| {
+                        let fastas = &clade_fastas.iter().map(|s| &**s).collect::<Vec<&str>>()[..];
+                        match m.is_present("no-core-genome") {
+                            false => cockatoo::nucmer_core_genome_generator::nucmer_core_genomes_from_genome_fasta_files(
+                                &fastas,
+                                i as u32),
+                            true => cockatoo::nucmer_core_genome_generator::all_genomes_as_core(
+                                &fastas,
+                                i as u32)
+                        }
+                    }
                 ).collect();
             info!("Finished calculating core genomes");
 
@@ -563,6 +574,9 @@ fn build_cli() -> App<'static, 'static> {
                         .long("max-contamination")
                         .takes_value(true)
                         .default_value("10"))
+                .arg(
+                    Arg::with_name("no-core-genome")
+                        .long("no-core-genome"))
 
                 .arg(Arg::with_name("verbose")
                      .short("v")
