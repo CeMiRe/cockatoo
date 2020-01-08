@@ -238,7 +238,7 @@ fn main(){
             let kmer_length = value_t!(m.value_of("kmer-length"), u8).unwrap();
             let clusters = match m.value_of("method") {
                 Some("minhash") => cockatoo::ani_clustering::minhash_clusterer::minhash_clusters(
-                    &v2, ani, n_hashes, kmer_length),
+                    &v2, ani, n_hashes, kmer_length, None),
                 Some("fastani") => 
                     panic!("The FastANI clusterer is currently buggy, and probably will be deprecated - use minhash"),
                 _ => unreachable!()

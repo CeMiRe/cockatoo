@@ -155,6 +155,8 @@ struct GenomeAlignment {
     ani: f32, // Must be last in the struct so derive of PartialEq works
 }
 
+/// Return a Vec of GenomeAlignment where alignments are only those where the
+/// ref alignment is before the query alignment.
 fn parse_fastani<R: Read>(
     reader: R,
     genome_order: &BTreeMap<String, usize>,
