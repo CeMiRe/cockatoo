@@ -1,6 +1,7 @@
 
 use std::collections::{BTreeSet,BTreeMap};
-use std::io::{BufReader};
+use std::io::BufReader;
+use std::sync::Mutex;
 use finch::distance::distance;
 use finch::serialization::Sketch;
 use rayon::prelude::*;
@@ -231,11 +232,15 @@ fn find_minhash_fastani_memberships(
         rep_to_index.insert(rep, i);
     }
 
-    let mut to_return: Vec<Vec<usize>> = vec![vec![]; representatives.len()];
-    for (i, sketch1) in sketches.iter().enumerate() {
+    let to_return: Mutex<Vec<Vec<usize>>> = Mutex::new(vec![vec![]; representatives.len()]);
+
+    sketches.par_iter().enumerate().for_each( |(i, sketch1)| {
         if representatives.contains(&i) {
-            to_return[rep_to_index[&i]].push(i);
+            to_return.lock().unwrap()[rep_to_index[&i]].push(i);
         } else {
+            // TODO: Parallelise this code. But, even better, just make a single
+            // FastANI call so that sketching doesn't have to be done multiple
+            // times.
             let mut best_rep_min_ani = None;
             let mut best_rep = None;
             for rep in representatives.iter() {
@@ -260,10 +265,11 @@ fn find_minhash_fastani_memberships(
                     }
                 }
             }
-            to_return[rep_to_index[best_rep.unwrap()]].push(i);
+            to_return.lock().unwrap()[rep_to_index[best_rep.unwrap()]].push(i);
         }
-    }
-    return to_return;
+    });
+
+    return to_return.into_inner().unwrap();
 }
 
 #[cfg(test)]
