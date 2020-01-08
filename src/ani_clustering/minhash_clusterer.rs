@@ -5,6 +5,7 @@ use std::sync::Mutex;
 use finch::distance::distance;
 use finch::serialization::Sketch;
 use rayon::prelude::*;
+use finish_command_safely;
 
 /// Given a list of genomes, return them clustered. If the fastani_threshold is
 /// set, use minhash for first pass analysis, then fastani as the actual threshold.
@@ -182,6 +183,7 @@ fn calculate_fastani(fasta1: &str, fasta2: &str) -> Option<f32> {
             }
         }
     }
+    finish_command_safely(process, "fastANI");
     debug!("FastANI of {} against {} was {:?}", fasta1, fasta2, to_return);
     return to_return;
 }
