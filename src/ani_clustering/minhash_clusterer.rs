@@ -3,6 +3,7 @@ use std::collections::{BTreeSet,BTreeMap};
 use std::io::{BufReader};
 use finch::distance::distance;
 use finch::serialization::Sketch;
+use rayon::prelude::*;
 
 /// Given a list of genomes, return them clustered. If the fastani_threshold is
 /// set, use minhash for first pass analysis, then fastani as the actual threshold.

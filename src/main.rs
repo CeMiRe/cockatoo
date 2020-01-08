@@ -239,8 +239,10 @@ fn main(){
             let clusters = match m.value_of("method") {
                 Some("minhash") => cockatoo::ani_clustering::minhash_clusterer::minhash_clusters(
                     &v2, ani, n_hashes, kmer_length, None),
-                Some("fastani") => 
-                    panic!("The FastANI clusterer is currently buggy, and probably will be deprecated - use minhash"),
+                Some("minhash+fastani") => cockatoo::ani_clustering::minhash_clusterer::minhash_clusters(
+                    &v2, 
+                    value_t!(m.value_of("minhash-prethreshold"), f32).expect("Failed to parse --minhash-prethreshold parameter"),
+                    n_hashes, kmer_length, Some(ani)),
                 _ => unreachable!()
             };
             info!("Found {} genome clusters", clusters.len());
@@ -620,6 +622,10 @@ fn build_cli() -> App<'static, 'static> {
                     .long("kmer-length")
                     .takes_value(true)
                     .default_value("21"))
+                .arg(Arg::with_name("minhash-prethreshold")
+                    .long("minhash-prethreshold")
+                    .takes_value(true)
+                    .default_value("90"))
                 .arg(Arg::with_name("genome-fasta-files")
                      .short("f")
                      .long("genome-fasta-files")
@@ -648,8 +654,8 @@ fn build_cli() -> App<'static, 'static> {
 
                 .arg(Arg::with_name("method")
                     .long("method")
-                    .possible_values(&["fastani","minhash"])
-                    .default_value("minhash")
+                    .possible_values(&["minhash+fastani","minhash"])
+                    .default_value("minhash+fastani")
                     .takes_value(true))
                 .arg(Arg::with_name("threads")
                     .short("-t")
