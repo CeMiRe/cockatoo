@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn test_minhash_fastani_hello_world() {
         init();
-        let clusters = minhash_clusters(
+        let mut clusters = minhash_clusters(
             &["tests/data/parsnp/1_first_group/73.20120800_S1X.13.fna",
               "tests/data/parsnp/1_first_group/73.20120600_S2D.19.fna",
               "tests/data/parsnp/1_first_group/73.20120700_S3X.12.fna",
@@ -336,6 +336,7 @@ mod tests {
             21,
             Some(95.0),
         );
+        for cluster in clusters.iter_mut() { cluster.sort_unstable(); }
         assert_eq!(
             vec![vec![0,1,2,3]],
             clusters
@@ -345,7 +346,7 @@ mod tests {
     #[test]
     fn test_minhash_fastani_two_clusters_same_ani() {
         init();
-        let clusters = minhash_clusters(
+        let mut clusters = minhash_clusters(
             &["tests/data/parsnp/1_first_group/73.20120800_S1X.13.fna",
               "tests/data/parsnp/1_first_group/73.20120600_S2D.19.fna",
               "tests/data/parsnp/1_first_group/73.20120700_S3X.12.fna",
@@ -356,6 +357,7 @@ mod tests {
             21,
             Some(98.0),
         );
+        for cluster in clusters.iter_mut() { cluster.sort_unstable(); }
         assert_eq!(
             vec![vec![0,1,3],vec![2]],
             clusters
@@ -365,7 +367,7 @@ mod tests {
     #[test]
     fn test_minhash_fastani_two_clusters_low_minhash_ani() {
         init();
-        let clusters = minhash_clusters(
+        let mut clusters = minhash_clusters(
             &["tests/data/parsnp/1_first_group/73.20120800_S1X.13.fna",
               "tests/data/parsnp/1_first_group/73.20120600_S2D.19.fna",
               "tests/data/parsnp/1_first_group/73.20120700_S3X.12.fna",
@@ -376,6 +378,7 @@ mod tests {
             21,
             Some(98.0),
         );
+        for cluster in clusters.iter_mut() { cluster.sort_unstable(); }
         assert_eq!(
             vec![vec![0,1,3],vec![2]],
             clusters
