@@ -1,6 +1,6 @@
 
 use std::collections::{BTreeSet,BTreeMap};
-use std::io::BufReader;
+use std::io::{BufReader,Write};
 use std::sync::Mutex;
 use finch::distance::distance;
 use finch::serialization::Sketch;
@@ -99,40 +99,35 @@ fn find_minhash_fastani_representatives(
     genomes: &[&str],
     minhash_ani_threshold: f64,
     fastani_threshold: f32)
-    -> (BTreeSet<usize>, BTreeMap<(usize, usize), f32>) {
+    -> (BTreeSet<usize>, BTreeMap<(usize, usize), Option<f32>>) {
 
     let mut clusters_to_return: BTreeSet<usize> = BTreeSet::new();
-    let mut fastani_cache: BTreeMap<(usize, usize), f32> = BTreeMap::new();
+    let mut fastani_cache: BTreeMap<(usize, usize), Option<f32>> = BTreeMap::new();
 
     for (i, sketch1) in sketches.iter().enumerate() {
-        let mut is_rep = true;
-        for j in &clusters_to_return {
-            let sketch2: &Sketch = &sketches[*j];
-            if distance(&sketch1.hashes, &sketch2.hashes, "", "", true)
+        // Gather a list of all genomes which pass the minhash threshold.
+        let potential_refs: Vec<_> = clusters_to_return.iter().filter( |j| {
+            let sketch2: &Sketch = &sketches[**j];
+            distance(&sketch1.hashes, &sketch2.hashes, "", "", true)
                 .expect("Failed to calculate distance by sketch comparison")
                 .mashDistance
-                <= minhash_ani_threshold {
+                <= minhash_ani_threshold
+        }).collect();
 
-                // Possibly not a represenative. Calculate (and cache) FastANI to check.
-                let fastani_result = calculate_fastani(genomes[i], genomes[*j]);
-
-                match fastani_result {
-                    None => {
-                        warn!(
-                            "Potentially unexpectedly genome comparison of \
-                            {} and {} showed a minhash hit, but no FastANI hit.", 
-                            genomes[i], genomes[*j]);
-                        // Insert something so it isn't calculated again later
-                        fastani_cache.insert((i,*j), 0.0);
-                    },
-                    Some(fastani) => {
-                        if fastani >= fastani_threshold {
-                            fastani_cache.insert((i,*j), fastani);
-                            is_rep = false;
-                            break;
-                        }
-                    }
-                }
+        // FastANI all potential reps against the current genome
+        let fastanis = calculate_fastani_many_to_one(
+            potential_refs.iter().map(|ref_index| genomes[**ref_index]).collect::<Vec<&str>>().as_slice(),
+            genomes[i]);
+        let mut is_rep = true;
+        for (potential_ref, fastani) in potential_refs.into_iter().zip(fastanis.iter()) {
+            // The reps always have a lower index that the genome under
+            // consideration, and the cache key is in ascending order.
+            fastani_cache.insert((*potential_ref,i), *fastani);
+            match fastani {
+                Some(ani) => if *ani >= fastani_threshold {
+                    is_rep = false
+                },
+                None => {}
             }
         }
         if is_rep {
@@ -188,6 +183,68 @@ fn calculate_fastani(fasta1: &str, fasta2: &str) -> Option<f32> {
     return to_return;
 }
 
+fn calculate_fastani_many_to_one(
+    query_genome_paths: &[&str],
+    ref_genome_path: &str)
+-> Vec<Option<f32>> {
+    if query_genome_paths.len() == 0 {
+        return vec![];
+    }
+
+    let mut query_to_index: BTreeMap<String,usize> = BTreeMap::new();
+    for (i, path) in query_genome_paths.iter().enumerate() {
+        query_to_index.insert(path.to_string(), i);
+    }
+
+    let mut tf = tempfile::NamedTempFile::new().expect("Failed to create tempfile for FastANI");
+    for query in query_genome_paths {
+        writeln!(tf, "{}", query).expect("Failed to write to FastANI tempfile");
+    }
+    tf.flush().expect("Failed to flush FastANI tempfile");
+    
+    let mut cmd = std::process::Command::new("fastANI");
+    cmd
+        .arg("-o")
+        .arg("/dev/stdout")
+        .arg("--query")
+        .arg(&ref_genome_path)
+        .arg("--refList")
+        .arg(tf.path().to_str().unwrap())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    debug!("Running fastANI command: {:?}", &cmd);
+    let mut process = cmd.spawn().expect(&format!("Failed to spawn {}", "fastANI"));
+    let stdout = process.stdout.as_mut().unwrap();
+    let stdout_reader = BufReader::new(stdout);
+
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false)
+        .from_reader(stdout_reader);
+
+    let mut to_return = vec![None; query_genome_paths.len()];
+
+    for record_res in rdr.records() {
+        match record_res {
+            Ok(record) => {
+                assert!(record.len() == 5);
+                let ani: f32 = record[2].parse().expect("Failed to convert fastani ANI to float value");
+                let query_name = &record[1];
+                let query_index: usize = *query_to_index.get(query_name)
+                    .expect(&format!("FastANI parse error: Failed to know what query genome {} is", query_name));
+                to_return[query_index] = Some(ani);
+                debug!("FastANI of {} against {} was {}", ref_genome_path, query_name, ani);
+            },
+            Err(e) => {
+                error!("Error parsing fastani output: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+    finish_command_safely(process, "FastANI");
+    return to_return;
+}
+
 /// For each genome (sketch) assign it to the closest representative genome:
 fn find_minhash_memberships(
     representatives: &BTreeSet<usize>,
@@ -225,7 +282,7 @@ fn find_minhash_fastani_memberships(
     representatives: &BTreeSet<usize>,
     sketches: &[Sketch],
     genomes: &[&str],
-    calculated_fastanis: &BTreeMap<(usize, usize), f32>,
+    calculated_fastanis: &BTreeMap<(usize, usize), Option<f32>>,
     minhash_threshold: f64
 ) -> Vec<Vec<usize>> {
     
@@ -250,20 +307,28 @@ fn find_minhash_fastani_memberships(
                     .expect("Failed to calculate distance by sketch comparison")
                     .mashDistance;
                 if minhash_dist < minhash_threshold {
-                    let fastani = match i < *rep {
+                    let fastani: Option<f32> = match i < *rep {
                         true => match calculated_fastanis.get(&(i, *rep)) {
-                            Some(ani) => Some(*ani),
+                            // ani could be known as f32, None for calculated
+                            // but below threshold, of not calculated.
+                            Some(ani_opt) => match ani_opt {
+                                Some(ani) => Some(*ani),
+                                None => None,
+                            },
                             None => calculate_fastani(genomes[i], genomes[*rep])
                         },
                         false => match calculated_fastanis.get(&(*rep, i)) {
-                            Some(ani) => Some(*ani),
+                            Some(ani_opt) => match ani_opt {
+                                Some(ani) => Some(*ani),
+                                None => None,
+                            },
                             None => calculate_fastani(genomes[i], genomes[*rep])
                         }
                     };
 
-                    if best_rep_min_ani.is_none() || fastani > best_rep_min_ani.unwrap() {
+                    if fastani.is_some() && (best_rep_min_ani.is_none() || fastani.unwrap() > best_rep_min_ani.unwrap()) {
                         best_rep = Some(rep);
-                        best_rep_min_ani = Some(fastani);
+                        best_rep_min_ani = fastani;
                     }
                 }
             }

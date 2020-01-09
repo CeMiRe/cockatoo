@@ -251,7 +251,7 @@ fn map_read_pair<Q: fastq::Record, K: Kmer+Send+Sync>(
         get_coverage(&fwd_hit_opt), get_coverage(&rev_hit_opt));
 
     // TODO: Maybe calculating the read_name isn't needed
-    let read_name = fwd_record.id().to_owned().expect("UTF-8 parsing error in read name").to_string();
+    let _read_name = fwd_record.id().to_owned().expect("UTF-8 parsing error in read name").to_string();
 
     let total_coverage = get_coverage(&fwd_hit_opt) + get_coverage(&rev_hit_opt);
     return if total_coverage > read_coverage_threshold()*2 {
