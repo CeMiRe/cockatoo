@@ -59,7 +59,7 @@ pub fn minhash_clusters(
             );
 
             return find_minhash_fastani_memberships(
-                &clusters, &sketches.sketches, genomes, &calculated_fastanis, distance_threshold
+                &clusters, &sketches.sketches, genomes, calculated_fastanis, distance_threshold
             );
         }
     }
@@ -135,52 +135,6 @@ fn find_minhash_fastani_representatives(
         }
     }
     return (clusters_to_return, fastani_cache);
-}
-
-fn calculate_fastani(fasta1: &str, fasta2: &str) -> Option<f32> {
-    let mut cmd = std::process::Command::new("fastANI");
-    cmd
-        .arg("-o")
-        .arg("/dev/stdout")
-        .arg("--query")
-        .arg(&fasta1)
-        .arg("--ref")
-        .arg(&fasta2)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    debug!("Running fastANI command: {:?}", &cmd);
-    let mut process = cmd.spawn().expect(&format!("Failed to spawn {}", "fastANI"));
-    let stdout = process.stdout.as_mut().unwrap();
-    let stdout_reader = BufReader::new(stdout);
-
-    let mut rdr = csv::ReaderBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(false)
-        .from_reader(stdout_reader);
-
-    let mut to_return = None;
-
-    for record_res in rdr.records() {
-        match record_res {
-            Ok(record) => {
-                assert!(record.len() == 5);
-                let ani: f32 = record[2].parse().expect("Failed to convert fastani ANI to float value");
-                if to_return.is_some() {
-                    error!("Unexpectedly found >1 result from fastANI");
-                    std::process::exit(1);
-                    
-                }
-                to_return = Some(ani);
-            },
-            Err(e) => {
-                error!("Error parsing fastani output: {}", e);
-                std::process::exit(1);
-            }
-        }
-    }
-    finish_command_safely(process, "fastANI");
-    debug!("FastANI of {} against {} was {:?}", fasta1, fasta2, to_return);
-    return to_return;
 }
 
 fn calculate_fastani_many_to_one(
@@ -285,7 +239,7 @@ fn find_minhash_fastani_memberships(
     representatives: &BTreeSet<usize>,
     sketches: &[Sketch],
     genomes: &[&str],
-    calculated_fastanis: &BTreeMap<(usize, usize), Option<f32>>,
+    calculated_fastanis: BTreeMap<(usize, usize), Option<f32>>,
     minhash_threshold: f64
 ) -> Vec<Vec<usize>> {
     
@@ -295,56 +249,67 @@ fn find_minhash_fastani_memberships(
     }
 
     let to_return: Mutex<Vec<Vec<usize>>> = Mutex::new(vec![vec![]; representatives.len()]);
+    let calculated_fastanis_lock = Mutex::new(calculated_fastanis);
 
     sketches.par_iter().enumerate().for_each( |(i, sketch1)| {
         if representatives.contains(&i) {
             to_return.lock().unwrap()[rep_to_index[&i]].push(i);
         } else {
-            let potential_refs = representatives.into_iter().filter(|rep| {
-                let (min_i, max_i) = if i < *rep {
-                    (i, *rep)
+            let potential_refs: Vec<&usize> = representatives.into_iter().filter(|rep| {
+                let (min_i, max_i) = if i < **rep {
+                    (i, **rep)
                 } else {
-                    (*rep, i)
+                    (**rep, i)
                 };
-                if calculated_fastanis.contains(&(min_i,max_i)) {
+                if calculated_fastanis_lock.lock().unwrap().contains_key(&(min_i,max_i)) {
                     true // FastANI not needed since already cached
                 } else {
-
+                    let minhash_dist = distance(&sketch1.hashes, &sketches[**rep].hashes, "", "", true)
+                    .expect("Failed to calculate distance by sketch comparison")
+                    .mashDistance;
+                    minhash_dist < minhash_threshold
                 }
             }).collect();
-            // TODO: Parallelise this code. But, even better, just make a single
-            // FastANI call so that sketching doesn't have to be done multiple
-            // times.
+
+            let new_fastanis = calculate_fastani_many_to_one(
+                &potential_refs.iter().map(|ref_i| genomes[**ref_i]).collect::<Vec<_>>(),
+                genomes[i],
+            );
+            for (ref_i, ani_opt) in new_fastanis.iter().enumerate() {
+                let (min_i, max_i) = if i < ref_i {
+                    (i, ref_i)
+                } else {
+                    (ref_i, i)
+                };
+                calculated_fastanis_lock.lock().unwrap().insert((min_i,max_i), *ani_opt);
+            };
+
+            // TODO: Is there FastANI bugs here? Donovan/Pierre seem to think so
             let mut best_rep_min_ani = None;
             let mut best_rep = None;
             for rep in representatives.iter() {
-                let minhash_dist = distance(&sketch1.hashes, &sketches[*rep].hashes, "", "", true)
-                    .expect("Failed to calculate distance by sketch comparison")
-                    .mashDistance;
-                if minhash_dist < minhash_threshold {
-                    let fastani: Option<f32> = match i < *rep {
-                        true => match calculated_fastanis.get(&(i, *rep)) {
-                            // ani could be known as f32, None for calculated
-                            // but below threshold, of not calculated.
-                            Some(ani_opt) => match ani_opt {
-                                Some(ani) => Some(*ani),
-                                None => None,
-                            },
-                            None => calculate_fastani(genomes[i], genomes[*rep])
+                let fastani: Option<f32> = match i < *rep {
+                    true => match calculated_fastanis_lock.lock().unwrap().get(&(i, *rep)) {
+                        // ani could be known as f32, None for calculated
+                        // but below threshold, of not calculated. If not calculated, it isn't nearby
+                        Some(ani_opt) => match ani_opt {
+                            Some(ani) => Some(*ani),
+                            None => None,
                         },
-                        false => match calculated_fastanis.get(&(*rep, i)) {
-                            Some(ani_opt) => match ani_opt {
-                                Some(ani) => Some(*ani),
-                                None => None,
-                            },
-                            None => calculate_fastani(genomes[i], genomes[*rep])
-                        }
-                    };
-
-                    if fastani.is_some() && (best_rep_min_ani.is_none() || fastani.unwrap() > best_rep_min_ani.unwrap()) {
-                        best_rep = Some(rep);
-                        best_rep_min_ani = fastani;
+                        None => None
+                    },
+                    false => match calculated_fastanis_lock.lock().unwrap().get(&(*rep, i)) {
+                        Some(ani_opt) => match ani_opt {
+                            Some(ani) => Some(*ani),
+                            None => None,
+                        },
+                        None => None
                     }
+                };
+
+                if fastani.is_some() && (best_rep_min_ani.is_none() || fastani.unwrap() > best_rep_min_ani.unwrap()) {
+                    best_rep = Some(rep);
+                    best_rep_min_ani = fastani;
                 }
             }
             to_return.lock().unwrap()[rep_to_index[best_rep.unwrap()]].push(i);
