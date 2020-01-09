@@ -195,12 +195,6 @@ fn calculate_fastani_many_to_one(
     for (i, path) in query_genome_paths.iter().enumerate() {
         query_to_index.insert(path.to_string(), i);
     }
-
-    let mut tf = tempfile::NamedTempFile::new().expect("Failed to create tempfile for FastANI");
-    for query in query_genome_paths {
-        writeln!(tf, "{}", query).expect("Failed to write to FastANI tempfile");
-    }
-    tf.flush().expect("Failed to flush FastANI tempfile");
     
     let mut cmd = std::process::Command::new("fastANI");
     cmd
@@ -209,13 +203,22 @@ fn calculate_fastani_many_to_one(
         .arg("--query")
         .arg(&ref_genome_path)
         .arg("--refList")
-        .arg(tf.path().to_str().unwrap())
+        .arg("/dev/stdin")
+        .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
     debug!("Running fastANI command: {:?}", &cmd);
     let mut process = cmd.spawn().expect(&format!("Failed to spawn {}", "fastANI"));
     let stdout = process.stdout.as_mut().unwrap();
     let stdout_reader = BufReader::new(stdout);
+
+    {
+        let mut stdin = process.stdin.take().unwrap();
+        for query in query_genome_paths {
+            writeln!(stdin, "{}", query).expect("Failed to write to FastANI stdin");
+        }
+        stdin.flush().expect("Failed to flush FastANI stdin");
+    }
 
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b'\t')
