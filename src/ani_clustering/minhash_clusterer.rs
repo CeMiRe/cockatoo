@@ -154,10 +154,10 @@ fn calculate_fastani_many_to_one(
     cmd
         .arg("-o")
         .arg("/dev/stdout")
-        .arg("--query")
-        .arg(&ref_genome_path)
-        .arg("--refList")
+        .arg("--queryList")
         .arg("/dev/stdin")
+        .arg("--ref")
+        .arg(&ref_genome_path)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -186,7 +186,7 @@ fn calculate_fastani_many_to_one(
             Ok(record) => {
                 assert!(record.len() == 5);
                 let ani: f32 = record[2].parse().expect("Failed to convert fastani ANI to float value");
-                let query_name = &record[1];
+                let query_name = &record[0];
                 let query_index: usize = *query_to_index.get(query_name)
                     .expect(&format!("FastANI parse error: Failed to know what query genome {} is", query_name));
                 to_return[query_index] = Some(ani);
