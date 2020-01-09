@@ -300,6 +300,18 @@ fn find_minhash_fastani_memberships(
         if representatives.contains(&i) {
             to_return.lock().unwrap()[rep_to_index[&i]].push(i);
         } else {
+            let potential_refs = representatives.into_iter().filter(|rep| {
+                let (min_i, max_i) = if i < *rep {
+                    (i, *rep)
+                } else {
+                    (*rep, i)
+                };
+                if calculated_fastanis.contains(&(min_i,max_i)) {
+                    true // FastANI not needed since already cached
+                } else {
+
+                }
+            }).collect();
             // TODO: Parallelise this code. But, even better, just make a single
             // FastANI call so that sketching doesn't have to be done multiple
             // times.
