@@ -38,6 +38,7 @@ extern crate csv;
 extern crate rstar;
 extern crate finch;
 extern crate seq_io;
+extern crate partitions;
 
 use std::io::Read;
 

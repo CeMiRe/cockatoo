@@ -6,6 +6,7 @@ use finch::distance::distance;
 use finch::serialization::Sketch;
 use rayon::prelude::*;
 use finish_command_safely;
+use partitions::partition_vec::PartitionVec;
 
 /// Given a list of genomes, return them clustered. If the fastani_threshold is
 /// set, use minhash for first pass analysis, then fastani as the actual threshold.
@@ -54,16 +55,72 @@ pub fn minhash_clusters(
             return find_minhash_memberships(&clusters, &sketches.sketches);
         },
         Some(fastani_threshold) => {
-            let (clusters, calculated_fastanis) = find_minhash_fastani_representatives(
-                &sketches.sketches, genomes, distance_threshold, fastani_threshold
-            );
+            let minhash_preclusters = partition_sketches(&sketches.sketches, distance_threshold);
+            trace!("Found minhash_preclusters: {:?}", minhash_preclusters);
 
-            return find_minhash_fastani_memberships(
-                &clusters, &sketches.sketches, genomes, calculated_fastanis, distance_threshold
-            );
+            let all_clusters: Mutex<Vec<Vec<usize>>> = Mutex::new(vec![]);
+
+            for genome_precluster_indices in minhash_preclusters.all_sets() {
+                let mut precluster_sketches = vec![];
+                let mut precluster_genomes = vec![];
+                let mut original_genome_indices: Vec<usize> = vec![];
+                for cluster_genome in genome_precluster_indices {
+                    precluster_sketches.push(&sketches.sketches[*cluster_genome.1]);
+                    precluster_genomes.push(genomes[*cluster_genome.1]);
+                    original_genome_indices.push(*cluster_genome.1);
+                }
+                debug!("Clustering pre-cluster {:?}", original_genome_indices);
+
+                let (clusters, calculated_fastanis) = find_minhash_fastani_representatives(
+                    precluster_sketches.as_slice(), precluster_genomes.as_slice(), distance_threshold, fastani_threshold
+                );
+
+                let clusters = find_minhash_fastani_memberships(
+                    &clusters, precluster_sketches.as_slice(), precluster_genomes.as_slice(), calculated_fastanis, distance_threshold
+                );
+                // Indices here are within this single linkage cluster only, so
+                // here we map them back to their original indices, and then
+                // insert back into the original array.
+                for cluster in clusters {
+                    all_clusters.lock().unwrap().push(
+                        cluster.iter().map(|within_index| original_genome_indices[*within_index]).collect()
+                    );
+                }
+            }
+            return all_clusters.into_inner().unwrap();
         }
     }
 
+}
+
+/// Create sub-sets by single linkage clustering
+fn partition_sketches(
+    sketches: &[Sketch],
+    distance_threshold: f64) 
+    -> PartitionVec<usize> {
+
+    let mut to_return: PartitionVec<usize> = PartitionVec::with_capacity(sketches.len());
+    for (i, _) in sketches.iter().enumerate() {
+        to_return.push(i);
+    }
+
+    for (i, sketch1) in sketches.iter().enumerate() {
+        for (j, sketch2) in sketches.iter().enumerate() {
+            trace!("Testing precluster between {} and {}", i, j);
+            if j >= i {
+                continue;
+            }
+            if distance(&sketch1.hashes, &sketch2.hashes, "", "", true)
+                .expect("Failed to calculate distance by sketch comparison")
+                .mashDistance
+                <= distance_threshold {
+
+                debug!("During preclustering, found a match between genomes {} and {}", i, j);
+                to_return.union(i,j)
+            }
+        }
+    }
+    return to_return;
 }
 
 /// Choose representatives, greedily assigning based on the min_ani threshold.
@@ -95,7 +152,7 @@ fn find_minhash_representatives(
 }
 
 fn find_minhash_fastani_representatives(
-    sketches: &[Sketch],
+    sketches: &[&Sketch],
     genomes: &[&str],
     minhash_ani_threshold: f64,
     fastani_threshold: f32)
@@ -116,7 +173,7 @@ fn find_minhash_fastani_representatives(
 
         // FastANI all potential reps against the current genome
         let fastanis = calculate_fastani_many_to_one(
-            potential_refs.iter().map(|ref_index| genomes[**ref_index]).collect::<Vec<&str>>().as_slice(),
+            potential_refs.iter().map(|ref_index| genomes[**ref_index]).collect::<Vec<_>>().as_slice(),
             genomes[i]);
         let mut is_rep = true;
         for (potential_ref, fastani) in potential_refs.into_iter().zip(fastanis.iter()) {
@@ -235,9 +292,11 @@ fn find_minhash_memberships(
     return to_return;
 }
 
+/// Given a list of representative genomes and a list of genomes, assign each
+/// genome to the closest representative.
 fn find_minhash_fastani_memberships(
     representatives: &BTreeSet<usize>,
-    sketches: &[Sketch],
+    sketches: &[&Sketch],
     genomes: &[&str],
     calculated_fastanis: BTreeMap<(usize, usize), Option<f32>>,
     minhash_threshold: f64
