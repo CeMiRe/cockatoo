@@ -60,20 +60,28 @@ pub fn minhash_clusters(
 
             let all_clusters: Mutex<Vec<Vec<usize>>> = Mutex::new(vec![]);
 
-            for genome_precluster_indices in minhash_preclusters.all_sets() {
+            // Convert single linkage data structure into just a list of list of indices
+            let mut preclusters: Vec<Vec<usize>> = minhash_preclusters.all_sets().map(|cluster| 
+                cluster.map(|cluster_genome| *cluster_genome.1).collect()
+            ).collect();
+
+            // Sort preclusters so bigger clusters are started before smaller
+            preclusters.sort_unstable_by( |c1, c2| c2.len().cmp(&c1.len()));
+            debug!("After sorting, found preclusters {:?}", preclusters);
+
+            preclusters.par_iter().for_each( |original_genome_indices| {
                 let mut precluster_sketches = vec![];
                 let mut precluster_genomes = vec![];
-                let mut original_genome_indices: Vec<usize> = vec![];
-                for cluster_genome in genome_precluster_indices {
-                    precluster_sketches.push(&sketches.sketches[*cluster_genome.1]);
-                    precluster_genomes.push(genomes[*cluster_genome.1]);
-                    original_genome_indices.push(*cluster_genome.1);
+                for original_genome_index in original_genome_indices {
+                    precluster_sketches.push(&sketches.sketches[*original_genome_index]);
+                    precluster_genomes.push(genomes[*original_genome_index]);
                 }
                 debug!("Clustering pre-cluster {:?}", original_genome_indices);
 
                 let (clusters, calculated_fastanis) = find_minhash_fastani_representatives(
                     precluster_sketches.as_slice(), precluster_genomes.as_slice(), distance_threshold, fastani_threshold
                 );
+                info!("Found {} genome representatives", clusters.len());
 
                 let clusters = find_minhash_fastani_memberships(
                     &clusters, precluster_sketches.as_slice(), precluster_genomes.as_slice(), calculated_fastanis, distance_threshold
@@ -86,7 +94,7 @@ pub fn minhash_clusters(
                         cluster.iter().map(|within_index| original_genome_indices[*within_index]).collect()
                     );
                 }
-            }
+            });
             return all_clusters.into_inner().unwrap();
         }
     }
