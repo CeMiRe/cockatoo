@@ -48,13 +48,16 @@ pub fn minhash_clusters(
             // Straight up minhash clustering.
 
             // Greedily find reps
+            info!("Finding cluster representatives by minhash ..");
             let clusters = find_minhash_representatives(&sketches.sketches, distance_threshold);
 
             // Reassign non-reps based so they are assigned to the nearest
             // representative.
+            info!("Assigning genomes to representatives by minhash ..");
             return find_minhash_memberships(&clusters, &sketches.sketches);
         },
         Some(fastani_threshold) => {
+            info!("Preclustering by MinHash ..");
             let minhash_preclusters = partition_sketches(&sketches.sketches, distance_threshold);
             trace!("Found minhash_preclusters: {:?}", minhash_preclusters);
 
@@ -67,7 +70,7 @@ pub fn minhash_clusters(
 
             // Sort preclusters so bigger clusters are started before smaller
             preclusters.sort_unstable_by( |c1, c2| c2.len().cmp(&c1.len()));
-            debug!("After sorting, found preclusters {:?}", preclusters);
+            info!("After sorting, found preclusters {:?}", preclusters);
 
             preclusters.par_iter().for_each( |original_genome_indices| {
                 let mut precluster_sketches = vec![];
@@ -78,11 +81,13 @@ pub fn minhash_clusters(
                 }
                 debug!("Clustering pre-cluster {:?}", original_genome_indices);
 
+                info!("Calculating genome representatives by minhash+fastani ..");
                 let (clusters, calculated_fastanis) = find_minhash_fastani_representatives(
                     precluster_sketches.as_slice(), precluster_genomes.as_slice(), distance_threshold, fastani_threshold
                 );
                 info!("Found {} genome representatives", clusters.len());
 
+                info!("Assigning genomes to representatives by minhash+fastani ..");
                 let clusters = find_minhash_fastani_memberships(
                     &clusters, precluster_sketches.as_slice(), precluster_genomes.as_slice(), calculated_fastanis, distance_threshold
                 );
