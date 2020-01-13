@@ -70,24 +70,29 @@ pub fn minhash_clusters(
 
             // Sort preclusters so bigger clusters are started before smaller
             preclusters.sort_unstable_by( |c1, c2| c2.len().cmp(&c1.len()));
-            info!("After sorting, found preclusters {:?}", preclusters);
+            debug!("After sorting, found preclusters {:?}", preclusters);
+            info!("Found {} preclusters. The largest contained {} genomes",
+                preclusters.len(), preclusters[0].len());
 
-            preclusters.par_iter().for_each( |original_genome_indices| {
+            info!("Finding representative genomes and assigning all genomes to these ..");
+            preclusters.par_iter().enumerate().for_each( |(precluster_id, original_genome_indices)| {
                 let mut precluster_sketches = vec![];
                 let mut precluster_genomes = vec![];
                 for original_genome_index in original_genome_indices {
                     precluster_sketches.push(&sketches.sketches[*original_genome_index]);
                     precluster_genomes.push(genomes[*original_genome_index]);
                 }
-                debug!("Clustering pre-cluster {:?}", original_genome_indices);
+                debug!("Clustering pre-cluster {}, with genome indices {:?}", precluster_id, original_genome_indices);
 
-                info!("Calculating genome representatives by minhash+fastani ..");
+                debug!("Calculating genome representatives by minhash+fastani in precluster {} ..",
+                    precluster_id);
                 let (clusters, calculated_fastanis) = find_minhash_fastani_representatives(
                     precluster_sketches.as_slice(), precluster_genomes.as_slice(), distance_threshold, fastani_threshold
                 );
-                info!("Found {} genome representatives", clusters.len());
+                debug!("In precluster {}, found {} genome representatives", precluster_id, clusters.len());
 
-                info!("Assigning genomes to representatives by minhash+fastani ..");
+                debug!("Assigning genomes to representatives by minhash+fastani in precluster {}..", 
+                    precluster_id);
                 let clusters = find_minhash_fastani_memberships(
                     &clusters, precluster_sketches.as_slice(), precluster_genomes.as_slice(), calculated_fastanis, distance_threshold
                 );
