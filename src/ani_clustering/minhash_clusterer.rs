@@ -190,7 +190,7 @@ fn find_minhash_fastani_representatives(
         }).collect();
 
         // FastANI all potential reps against the current genome
-        let fastanis = calculate_fastani_many_to_one(
+        let fastanis = calculate_fastani_many_to_one_pairwise(
             potential_refs.iter().map(|ref_index| genomes[**ref_index]).collect::<Vec<_>>().as_slice(),
             genomes[i]);
         let mut is_rep = true;
@@ -276,6 +276,64 @@ fn calculate_fastani_many_to_one(
     finish_command_safely(process, "FastANI");
     return to_return;
 }
+
+/// Calculate FastANI values, submitting each genome pair in parallel.
+fn calculate_fastani_many_to_one_pairwise(
+    query_genome_paths: &[&str],
+    ref_genome_path: &str)
+-> Vec<Option<f32>> {
+
+    query_genome_paths.par_iter().map(|query_genome| {
+        calculate_fastani(query_genome, ref_genome_path)
+    }).collect()
+}
+
+fn calculate_fastani(fasta1: &str, fasta2: &str) -> Option<f32> {
+    let mut cmd = std::process::Command::new("fastANI");
+    cmd
+        .arg("-o")
+        .arg("/dev/stdout")
+        .arg("--query")
+        .arg(&fasta1)
+        .arg("--ref")
+        .arg(&fasta2)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    debug!("Running fastANI command: {:?}", &cmd);
+    let mut process = cmd.spawn().expect(&format!("Failed to spawn {}", "fastANI"));
+    let stdout = process.stdout.as_mut().unwrap();
+    let stdout_reader = BufReader::new(stdout);
+
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false)
+        .from_reader(stdout_reader);
+
+    let mut to_return = None;
+
+    for record_res in rdr.records() {
+        match record_res {
+            Ok(record) => {
+                assert!(record.len() == 5);
+                let ani: f32 = record[2].parse().expect("Failed to convert fastani ANI to float value");
+                if to_return.is_some() {
+                    error!("Unexpectedly found >1 result from fastANI");
+                    std::process::exit(1);
+                    
+                }
+                to_return = Some(ani);
+            },
+            Err(e) => {
+                error!("Error parsing fastani output: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+    debug!("FastANI of {} against {} was {:?}", fasta1, fasta2, to_return);
+    finish_command_safely(process, "FastANI");
+    return to_return;
+}
+
 
 /// For each genome (sketch) assign it to the closest representative genome:
 fn find_minhash_memberships(
