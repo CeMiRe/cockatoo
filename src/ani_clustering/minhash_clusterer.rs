@@ -426,7 +426,7 @@ fn find_minhash_fastani_memberships(
                 let fastani: Option<f32> = match i < *rep {
                     true => match calculated_fastanis_lock.lock().unwrap().get(&(i, *rep)) {
                         // ani could be known as f32, None for calculated
-                        // but below threshold, of not calculated. If not calculated, it isn't nearby
+                        // but below threshold, or not calculated. If not calculated, it isn't nearby
                         Some(ani_opt) => match ani_opt {
                             Some(ani) => Some(*ani),
                             None => None,
